@@ -14,6 +14,7 @@ EQUIPAMENTOS, SOFTWARES E MATERIAIS
   1 - Placa ESP32,
   1 - Roteador A930H,
   1 - Computador.
+  cabos de transmissão
   Eclipse,
   Apache NetBens IDE 15,
   Visual Studio Code.
