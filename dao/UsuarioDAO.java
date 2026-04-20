@@ -1,0 +1,110 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.Usuario;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class UsuarioDAO {
+    private static final String FILE_NAME = "usuarios.json";
+    private List<Usuario> usuarios;
+    
+    public UsuarioDAO() {
+        carregarUsuarios();
+    }
+    
+    private void carregarUsuarios() {
+        usuarios = DatabaseConnection.carregarLista(FILE_NAME, Usuario.class);
+        if (usuarios == null) {
+            usuarios = new ArrayList<>();
+        }
+    }
+    
+    private void salvarUsuarios() {
+        DatabaseConnection.salvarLista(FILE_NAME, usuarios);
+    }
+    
+    public boolean inserir(Usuario usuario) {
+        if (buscarPorLogin(usuario.getLogin()) != null) {
+            return false;
+        }
+        if (buscarPorCpf(usuario.getCpf()) != null) {
+            return false;
+        }
+        if (buscarPorMatricula(usuario.getMatricula()) != null) {
+            return false;
+        }
+        
+        usuario.setId(DatabaseConnection.gerarNovoId(usuarios));
+        usuario.setDataCadastro(new Date());
+        usuarios.add(usuario);
+        salvarUsuarios();
+        return true;
+    }
+    
+    public boolean atualizar(Usuario usuario) {
+        for (int i = 0; i < usuarios.size(); i++) {
+            if (usuarios.get(i).getId() == usuario.getId()) {
+                usuarios.set(i, usuario);
+                salvarUsuarios();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public boolean excluir(int id) {
+        boolean removido = usuarios.removeIf(u -> u.getId() == id);
+        if (removido) {
+            salvarUsuarios();
+        }
+        return removido;
+    }
+    
+    public Usuario buscarPorId(int id) {
+        return usuarios.stream()
+            .filter(u -> u.getId() == id)
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public Usuario buscarPorLogin(String login) {
+        return usuarios.stream()
+            .filter(u -> u.getLogin() != null && u.getLogin().equals(login))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public Usuario buscarPorCpf(String cpf) {
+        return usuarios.stream()
+            .filter(u -> u.getCpf() != null && u.getCpf().equals(cpf))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public Usuario buscarPorMatricula(String matricula) {
+        return usuarios.stream()
+            .filter(u -> u.getMatricula() != null && u.getMatricula().equals(matricula))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public Usuario autenticar(String login, String senha) {
+        return usuarios.stream()
+            .filter(u -> u.getLogin() != null && u.getLogin().equals(login) &&
+                        u.getSenha() != null && u.getSenha().equals(senha))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public List<Usuario> listarTodos() {
+        return new ArrayList<>(usuarios);
+    }
+    
+    public List<Usuario> listarPorFuncao(String funcao) {
+        return usuarios.stream()
+            .filter(u -> u.getFuncao() != null && u.getFuncao().equals(funcao))
+            .collect(Collectors.toList());
+    }
+}
