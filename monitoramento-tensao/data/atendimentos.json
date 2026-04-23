@@ -1,0 +1,40 @@
+[ {
+  "id" : 1,
+  "idCliente" : 1,
+  "tipo" : "INFORMACAO",
+  "status" : "CONCLUIDO",
+  "assunto" : "Teste",
+  "descricao" : "Teste\n\n--- CONCLUSÃO ---\nTeste",
+  "prioridade" : "BAIXA",
+  "dataAbertura" : "2026-04-22T21:00:50.068+00:00",
+  "dataConclusao" : "2026-04-22T21:00:59.199+00:00",
+  "idUsuarioAbertura" : 1,
+  "idUsuarioAtendimento" : 1,
+  "idOrdemServicoVinculada" : 0
+}, {
+  "id" : 2,
+  "idCliente" : 1,
+  "tipo" : "SOLICITACAO",
+  "status" : "CANCELADO",
+  "assunto" : "Teste",
+  "descricao" : "Teste\n\n--- CANCELAMENTO ---\nData: 22/04/2026 18:01:39\nCancelado por: Elberty Borges de Oliveira\nCategoria: CLIENTE DESISTIU\nMotivo: Teste",
+  "prioridade" : "BAIXA",
+  "dataAbertura" : "2026-04-22T21:01:18.215+00:00",
+  "dataConclusao" : "2026-04-22T21:01:39.359+00:00",
+  "idUsuarioAbertura" : 1,
+  "idUsuarioAtendimento" : 1,
+  "idOrdemServicoVinculada" : 0
+}, {
+  "id" : 3,
+  "idCliente" : 1,
+  "tipo" : "SOLICITACAO",
+  "status" : "CONCLUIDO",
+  "assunto" : "Teste",
+  "descricao" : "Teste\n\n--- CONVERSÃO PARA OS ---\nConvertido para OS #1 (INFORMAÇÃO) - Atendimento encaminhado ao 1º Nível.",
+  "prioridade" : "BAIXA",
+  "dataAbertura" : "2026-04-22T21:01:52.001+00:00",
+  "dataConclusao" : "2026-04-22T21:01:58.805+00:00",
+  "idUsuarioAbertura" : 1,
+  "idUsuarioAtendimento" : 1,
+  "idOrdemServicoVinculada" : 1
+} ]

@@ -1,0 +1,404 @@
+// TelaEstoque.java (JPanel - já está correto, apenas verificando)
+package com.monitoramento.ui;
+
+import com.monitoramento.model.ProdutoEstoque;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.ProdutoEstoqueDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.List;
+
+public class TelaEstoque extends JPanel {
+    private ProdutoEstoqueDAO produtoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaProdutos;
+    private DefaultTableModel tableModel;
+    
+    // Componentes do formulário de produtos
+    private JTextField txtId, txtCodigo, txtNome, txtFabricante, txtModelo;
+    private JTextField txtQuantidade, txtQuantidadeMinima, txtPrecoCusto, txtPrecoVenda;
+    private JTextField txtLocalizacao;
+    private JComboBox<String> comboCategoria, comboUnidade;
+    private JTextArea txtDescricao;
+    private JCheckBox chkAtivo;
+    private JButton btnInserir, btnAtualizar, btnExcluir, btnLimpar;
+    
+    public TelaEstoque(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.produtoDAO = new ProdutoEstoqueDAO();
+        
+        initComponents();
+        carregarProdutos();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.5);
+        
+        // Tabela
+        String[] colunas = {"ID", "Código", "Nome", "Categoria", "Fabricante", "Quantidade", "Est. Mínimo", "Preço Venda", "Ativo"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaProdutos = new JTable(tableModel);
+        tabelaProdutos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabelaProdutos.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                carregarProdutoSelecionado();
+            }
+        });
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaProdutos);
+        
+        // Formulário
+        JPanel panelForm = criarPainelFormulario();
+        
+        splitPane.setTopComponent(scrollTabela);
+        splitPane.setBottomComponent(panelForm);
+        
+        add(splitPane, BorderLayout.CENTER);
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnNovo = new JButton("Novo");
+        btnNovo.addActionListener(e -> limparFormulario());
+        
+        JButton btnRefresh = new JButton("Atualizar");
+        btnRefresh.addActionListener(e -> carregarProdutos());
+        
+        toolBar.add(btnNovo);
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        add(toolBar, BorderLayout.NORTH);
+    }
+    
+    private JPanel criarPainelFormulario() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Dados do Produto"));
+        
+        JPanel panelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        // Linha 0
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelCampos.add(new JLabel("ID:"), gbc);
+        txtId = new JTextField(5);
+        txtId.setEditable(false);
+        gbc.gridx = 1;
+        panelCampos.add(txtId, gbc);
+        
+        gbc.gridx = 2;
+        panelCampos.add(new JLabel("Código:*"), gbc);
+        txtCodigo = new JTextField(15);
+        gbc.gridx = 3;
+        panelCampos.add(txtCodigo, gbc);
+        
+        // Linha 1
+        gbc.gridx = 0; gbc.gridy = 1;
+        panelCampos.add(new JLabel("Nome:*"), gbc);
+        txtNome = new JTextField(25);
+        gbc.gridx = 1; gbc.gridwidth = 3;
+        panelCampos.add(txtNome, gbc);
+        gbc.gridwidth = 1;
+        
+        // Linha 2
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelCampos.add(new JLabel("Categoria:*"), gbc);
+        comboCategoria = new JComboBox<>(new String[]{"EQUIPAMENTO", "PECA", "ACESSORIO", "OUTRO"});
+        gbc.gridx = 1;
+        panelCampos.add(comboCategoria, gbc);
+        
+        gbc.gridx = 2;
+        panelCampos.add(new JLabel("Unidade:*"), gbc);
+        comboUnidade = new JComboBox<>(new String[]{"UN", "PC", "MT", "LT"});
+        gbc.gridx = 3;
+        panelCampos.add(comboUnidade, gbc);
+        
+        // Linha 3
+        gbc.gridx = 0; gbc.gridy = 3;
+        panelCampos.add(new JLabel("Fabricante:"), gbc);
+        txtFabricante = new JTextField(15);
+        gbc.gridx = 1;
+        panelCampos.add(txtFabricante, gbc);
+        
+        gbc.gridx = 2;
+        panelCampos.add(new JLabel("Modelo:"), gbc);
+        txtModelo = new JTextField(15);
+        gbc.gridx = 3;
+        panelCampos.add(txtModelo, gbc);
+        
+        // Linha 4
+        gbc.gridx = 0; gbc.gridy = 4;
+        panelCampos.add(new JLabel("Quantidade:*"), gbc);
+        txtQuantidade = new JTextField(8);
+        gbc.gridx = 1;
+        panelCampos.add(txtQuantidade, gbc);
+        
+        gbc.gridx = 2;
+        panelCampos.add(new JLabel("Quantidade Mínima:"), gbc);
+        txtQuantidadeMinima = new JTextField(8);
+        gbc.gridx = 3;
+        panelCampos.add(txtQuantidadeMinima, gbc);
+        
+        // Linha 5
+        gbc.gridx = 0; gbc.gridy = 5;
+        panelCampos.add(new JLabel("Preço Custo (R$):"), gbc);
+        txtPrecoCusto = new JTextField(10);
+        gbc.gridx = 1;
+        panelCampos.add(txtPrecoCusto, gbc);
+        
+        gbc.gridx = 2;
+        panelCampos.add(new JLabel("Preço Venda (R$):*"), gbc);
+        txtPrecoVenda = new JTextField(10);
+        gbc.gridx = 3;
+        panelCampos.add(txtPrecoVenda, gbc);
+        
+        // Linha 6
+        gbc.gridx = 0; gbc.gridy = 6;
+        panelCampos.add(new JLabel("Localização:"), gbc);
+        txtLocalizacao = new JTextField(20);
+        gbc.gridx = 1; gbc.gridwidth = 3;
+        panelCampos.add(txtLocalizacao, gbc);
+        gbc.gridwidth = 1;
+        
+        // Linha 7
+        gbc.gridx = 0; gbc.gridy = 7;
+        panelCampos.add(new JLabel("Descrição:"), gbc);
+        txtDescricao = new JTextArea(3, 40);
+        txtDescricao.setLineWrap(true);
+        JScrollPane scrollDesc = new JScrollPane(txtDescricao);
+        gbc.gridx = 1; gbc.gridwidth = 3;
+        panelCampos.add(scrollDesc, gbc);
+        gbc.gridwidth = 1;
+        
+        // Linha 8
+        gbc.gridx = 0; gbc.gridy = 8;
+        panelCampos.add(new JLabel("Ativo:"), gbc);
+        chkAtivo = new JCheckBox();
+        chkAtivo.setSelected(true);
+        gbc.gridx = 1;
+        panelCampos.add(chkAtivo, gbc);
+        
+        // Botões
+        JPanel panelBotoes = new JPanel(new FlowLayout());
+        btnInserir = new JButton("Inserir");
+        btnAtualizar = new JButton("Atualizar");
+        btnExcluir = new JButton("Excluir");
+        btnLimpar = new JButton("Limpar");
+        
+        btnInserir.addActionListener(e -> inserirProduto());
+        btnAtualizar.addActionListener(e -> atualizarProduto());
+        btnExcluir.addActionListener(e -> excluirProduto());
+        btnLimpar.addActionListener(e -> limparFormulario());
+        
+        panelBotoes.add(btnInserir);
+        panelBotoes.add(btnAtualizar);
+        panelBotoes.add(btnExcluir);
+        panelBotoes.add(btnLimpar);
+        
+        panel.add(panelCampos, BorderLayout.CENTER);
+        panel.add(panelBotoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void carregarProdutos() {
+        tableModel.setRowCount(0);
+        List<ProdutoEstoque> produtos = produtoDAO.listarTodos();
+        
+        for (ProdutoEstoque p : produtos) {
+            Object[] row = {
+                p.getId(),
+                p.getCodigo(),
+                p.getNome(),
+                p.getCategoria(),
+                p.getFabricante() != null ? p.getFabricante() : "",
+                p.getQuantidade(),
+                p.getQuantidadeMinima(),
+                String.format("R$ %.2f", p.getPrecoVenda()),
+                p.isAtivo() ? "SIM" : "NÃO"
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void carregarProdutoSelecionado() {
+        int row = tabelaProdutos.getSelectedRow();
+        if (row >= 0) {
+            int id = (int) tableModel.getValueAt(row, 0);
+            ProdutoEstoque p = produtoDAO.buscarPorId(id);
+            if (p != null) {
+                txtId.setText(String.valueOf(p.getId()));
+                txtCodigo.setText(p.getCodigo());
+                txtNome.setText(p.getNome());
+                comboCategoria.setSelectedItem(p.getCategoria());
+                txtFabricante.setText(p.getFabricante());
+                txtModelo.setText(p.getModelo());
+                txtQuantidade.setText(String.valueOf(p.getQuantidade()));
+                txtQuantidadeMinima.setText(String.valueOf(p.getQuantidadeMinima()));
+                txtPrecoCusto.setText(String.format("%.2f", p.getPrecoCusto()));
+                txtPrecoVenda.setText(String.format("%.2f", p.getPrecoVenda()));
+                comboUnidade.setSelectedItem(p.getUnidadeMedida());
+                txtLocalizacao.setText(p.getLocalizacao());
+                txtDescricao.setText(p.getDescricao());
+                chkAtivo.setSelected(p.isAtivo());
+            }
+        }
+    }
+    
+    private void inserirProduto() {
+        if (!validarCampos()) return;
+        
+        ProdutoEstoque produto = new ProdutoEstoque();
+        preencherProduto(produto);
+        
+        if (produtoDAO.inserir(produto)) {
+            JOptionPane.showMessageDialog(this, "Produto inserido com sucesso!");
+            carregarProdutos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao inserir produto!\nVerifique se o código já está cadastrado.", 
+                                        "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void atualizarProduto() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um produto para atualizar!");
+            return;
+        }
+        
+        if (!validarCampos()) return;
+        
+        ProdutoEstoque produto = new ProdutoEstoque();
+        produto.setId(Integer.parseInt(txtId.getText()));
+        preencherProduto(produto);
+        
+        if (produtoDAO.atualizar(produto)) {
+            JOptionPane.showMessageDialog(this, "Produto atualizado com sucesso!");
+            carregarProdutos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar produto!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void excluirProduto() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um produto para excluir!");
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Deseja realmente excluir este produto?", 
+            "Confirmar exclusão", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            int id = Integer.parseInt(txtId.getText());
+            if (produtoDAO.excluir(id)) {
+                JOptionPane.showMessageDialog(this, "Produto excluído com sucesso!");
+                carregarProdutos();
+                limparFormulario();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao excluir produto!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void preencherProduto(ProdutoEstoque produto) {
+        produto.setCodigo(txtCodigo.getText().trim().toUpperCase());
+        produto.setNome(txtNome.getText().trim());
+        produto.setCategoria((String) comboCategoria.getSelectedItem());
+        produto.setFabricante(txtFabricante.getText().trim());
+        produto.setModelo(txtModelo.getText().trim());
+        produto.setQuantidade(Integer.parseInt(txtQuantidade.getText().trim()));
+        produto.setQuantidadeMinima(Integer.parseInt(txtQuantidadeMinima.getText().trim()));
+        produto.setPrecoCusto(Double.parseDouble(txtPrecoCusto.getText().trim().replace(",", ".")));
+        produto.setPrecoVenda(Double.parseDouble(txtPrecoVenda.getText().trim().replace(",", ".")));
+        produto.setUnidadeMedida((String) comboUnidade.getSelectedItem());
+        produto.setLocalizacao(txtLocalizacao.getText().trim());
+        produto.setDescricao(txtDescricao.getText().trim());
+        produto.setAtivo(chkAtivo.isSelected());
+    }
+    
+    private boolean validarCampos() {
+        if (txtCodigo.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Código é obrigatório!");
+            return false;
+        }
+        
+        if (txtNome.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nome é obrigatório!");
+            return false;
+        }
+        
+        try {
+            int quantidade = Integer.parseInt(txtQuantidade.getText().trim());
+            if (quantidade < 0) {
+                JOptionPane.showMessageDialog(this, "Quantidade não pode ser negativa!");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Quantidade inválida!");
+            return false;
+        }
+        
+        try {
+            int quantidadeMinima = Integer.parseInt(txtQuantidadeMinima.getText().trim());
+            if (quantidadeMinima < 0) {
+                JOptionPane.showMessageDialog(this, "Quantidade mínima não pode ser negativa!");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Quantidade mínima inválida!");
+            return false;
+        }
+        
+        try {
+            double precoVenda = Double.parseDouble(txtPrecoVenda.getText().trim().replace(",", "."));
+            if (precoVenda < 0) {
+                JOptionPane.showMessageDialog(this, "Preço de venda não pode ser negativo!");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Preço de venda inválido!");
+            return false;
+        }
+        
+        return true;
+    }
+    
+    private void limparFormulario() {
+        txtId.setText("");
+        txtCodigo.setText("");
+        txtNome.setText("");
+        comboCategoria.setSelectedIndex(0);
+        txtFabricante.setText("");
+        txtModelo.setText("");
+        txtQuantidade.setText("0");
+        txtQuantidadeMinima.setText("0");
+        txtPrecoCusto.setText("0");
+        txtPrecoVenda.setText("0");
+        comboUnidade.setSelectedIndex(0);
+        txtLocalizacao.setText("");
+        txtDescricao.setText("");
+        chkAtivo.setSelected(true);
+        txtCodigo.requestFocus();
+    }
+}

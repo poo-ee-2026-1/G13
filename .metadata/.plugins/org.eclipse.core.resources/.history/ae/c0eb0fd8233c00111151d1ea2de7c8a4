@@ -1,0 +1,133 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.MedicaoTensao;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+public class MedicaoTensaoDAO {
+    
+    public boolean inserir(MedicaoTensao medicao) {
+        String sql = "INSERT INTO medicoes_tensao (id_cliente, tensao, data_hora, estado_rede, situacao_rede) " +
+                     "VALUES (?, ?, ?, ?, ?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setInt(1, medicao.getIdCliente());
+            stmt.setDouble(2, medicao.getTensao());
+            stmt.setTimestamp(3, new Timestamp(medicao.getDataHora().getTime()));
+            stmt.setString(4, medicao.getEstadoRede());
+            stmt.setString(5, medicao.getSituacaoRede());
+            
+            int affectedRows = stmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        medicao.setId(rs.getInt(1));
+                    }
+                }
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public List<MedicaoTensao> buscarPorCliente(int idCliente, Date dataInicio, Date dataFim) {
+        List<MedicaoTensao> medicoes = new ArrayList<>();
+        String sql = "SELECT * FROM medicoes_tensao WHERE id_cliente = ? AND data_hora BETWEEN ? AND ? ORDER BY data_hora DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            stmt.setTimestamp(2, new Timestamp(dataInicio.getTime()));
+            stmt.setTimestamp(3, new Timestamp(dataFim.getTime()));
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    medicoes.add(mapearMedicao(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return medicoes;
+    }
+    
+    public List<MedicaoTensao> buscarUltimasMedicoes(int idCliente, int limite) {
+        List<MedicaoTensao> medicoes = new ArrayList<>();
+        String sql = "SELECT * FROM medicoes_tensao WHERE id_cliente = ? ORDER BY data_hora DESC LIMIT ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            stmt.setInt(2, limite);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    medicoes.add(mapearMedicao(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return medicoes;
+    }
+    
+    public double calcularMediaTensao(int idCliente, Date dataInicio, Date dataFim) {
+        String sql = "SELECT AVG(tensao) as media FROM medicoes_tensao WHERE id_cliente = ? AND data_hora BETWEEN ? AND ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            stmt.setTimestamp(2, new Timestamp(dataInicio.getTime()));
+            stmt.setTimestamp(3, new Timestamp(dataFim.getTime()));
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("media");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    public boolean excluirMedicoesAntigas(int dias) {
+        String sql = "DELETE FROM medicoes_tensao WHERE data_hora < DATE_SUB(NOW(), INTERVAL ? DAY)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, dias);
+            int deleted = stmt.executeUpdate();
+            System.out.println("Excluídas " + deleted + " medições antigas");
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    private MedicaoTensao mapearMedicao(ResultSet rs) throws SQLException {
+        MedicaoTensao m = new MedicaoTensao();
+        m.setId(rs.getInt("id"));
+        m.setIdCliente(rs.getInt("id_cliente"));
+        m.setTensao(rs.getDouble("tensao"));
+        m.setDataHora(new Date(rs.getTimestamp("data_hora").getTime()));
+        m.setEstadoRede(rs.getString("estado_rede"));
+        m.setSituacaoRede(rs.getString("situacao_rede"));
+        return m;
+    }
+}

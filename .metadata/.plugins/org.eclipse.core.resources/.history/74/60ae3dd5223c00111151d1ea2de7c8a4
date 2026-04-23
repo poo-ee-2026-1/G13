@@ -1,0 +1,357 @@
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Equipamento;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.dao.ClienteDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.List;
+
+public class TelaEquipamentos extends JFrame {
+    private JTable tabelaEquipamentos;
+    private DefaultTableModel tableModel;
+    private EquipamentoDAO equipamentoDAO;
+    private ClienteDAO clienteDAO;
+    private Usuario usuarioLogado;
+    
+    private JTextField txtId, txtMarca, txtModelo, txtTensaoNominal;
+    private JComboBox<ClienteCombo> comboCliente;
+    private JButton btnInserir, btnAtualizar, btnExcluir, btnLimpar;
+    
+    public TelaEquipamentos(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.clienteDAO = new ClienteDAO();
+        initComponents();
+        carregarEquipamentos();
+        carregarClientesCombo();
+        setLocationRelativeTo(null);
+    }
+    
+    private void initComponents() {
+        setTitle("Gerenciamento de Equipamentos - Usuário: " + usuarioLogado.getLogin());
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setSize(900, 600);
+        setLayout(new BorderLayout());
+        
+        // Painel principal dividido
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.5);
+        
+        // Tabela de equipamentos
+        String[] colunas = {"ID", "Marca", "Modelo", "Tensão Nominal (V)", "Cliente"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaEquipamentos = new JTable(tableModel);
+        tabelaEquipamentos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabelaEquipamentos.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                carregarEquipamentoSelecionado();
+            }
+        });
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaEquipamentos);
+        
+        // Painel de formulário
+        JPanel panelForm = criarPainelFormulario();
+        
+        splitPane.setTopComponent(scrollTabela);
+        splitPane.setBottomComponent(panelForm);
+        
+        add(splitPane, BorderLayout.CENTER);
+        
+        // Barra de ferramentas
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnNovo = new JButton("Novo");
+        btnNovo.addActionListener(e -> limparFormulario());
+        
+        JButton btnRefresh = new JButton("Atualizar");
+        btnRefresh.addActionListener(e -> carregarEquipamentos());
+        
+        JButton btnVoltar = new JButton("Voltar");
+        btnVoltar.addActionListener(e -> dispose());
+        
+        toolBar.add(btnNovo);
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        toolBar.add(btnVoltar);
+        
+        add(toolBar, BorderLayout.NORTH);
+    }
+    
+    private JPanel criarPainelFormulario() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Dados do Equipamento"));
+        
+        JPanel panelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        // ID
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelCampos.add(new JLabel("ID:"), gbc);
+        txtId = new JTextField(10);
+        txtId.setEditable(false);
+        gbc.gridx = 1;
+        panelCampos.add(txtId, gbc);
+        
+        // Marca
+        gbc.gridx = 0; gbc.gridy = 1;
+        panelCampos.add(new JLabel("Marca:*"), gbc);
+        txtMarca = new JTextField(20);
+        gbc.gridx = 1;
+        panelCampos.add(txtMarca, gbc);
+        
+        // Modelo
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelCampos.add(new JLabel("Modelo:*"), gbc);
+        txtModelo = new JTextField(20);
+        gbc.gridx = 1;
+        panelCampos.add(txtModelo, gbc);
+        
+        // Tensão Nominal
+        gbc.gridx = 0; gbc.gridy = 3;
+        panelCampos.add(new JLabel("Tensão Nominal (V):*"), gbc);
+        txtTensaoNominal = new JTextField(10);
+        gbc.gridx = 1;
+        panelCampos.add(txtTensaoNominal, gbc);
+        
+        JLabel lblInfo = new JLabel("(Valores permitidos: 1 a 1500)");
+        lblInfo.setFont(new Font("Arial", Font.ITALIC, 10));
+        lblInfo.setForeground(Color.GRAY);
+        gbc.gridx = 2;
+        panelCampos.add(lblInfo, gbc);
+        
+        // Cliente
+        gbc.gridx = 0; gbc.gridy = 4;
+        panelCampos.add(new JLabel("Cliente:*"), gbc);
+        comboCliente = new JComboBox<>();
+        comboCliente.setPreferredSize(new Dimension(300, 25));
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        panelCampos.add(comboCliente, gbc);
+        gbc.gridwidth = 1;
+        
+        // Botões
+        JPanel panelBotoes = new JPanel(new FlowLayout());
+        btnInserir = new JButton("Inserir");
+        btnAtualizar = new JButton("Atualizar");
+        btnExcluir = new JButton("Excluir");
+        btnLimpar = new JButton("Limpar");
+        
+        btnInserir.addActionListener(e -> inserirEquipamento());
+        btnAtualizar.addActionListener(e -> atualizarEquipamento());
+        btnExcluir.addActionListener(e -> excluirEquipamento());
+        btnLimpar.addActionListener(e -> limparFormulario());
+        
+        panelBotoes.add(btnInserir);
+        panelBotoes.add(btnAtualizar);
+        panelBotoes.add(btnExcluir);
+        panelBotoes.add(btnLimpar);
+        
+        panel.add(panelCampos, BorderLayout.CENTER);
+        panel.add(panelBotoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void carregarEquipamentos() {
+        tableModel.setRowCount(0);
+        List<Equipamento> equipamentos = equipamentoDAO.listarTodos();
+        
+        for (Equipamento e : equipamentos) {
+            Cliente cliente = clienteDAO.buscarPorId(e.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            Object[] row = {
+                e.getId(),
+                e.getMarca(),
+                e.getModelo(),
+                String.format("%.2f", e.getTensaoNominal()),
+                nomeCliente
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void carregarClientesCombo() {
+        comboCliente.removeAllItems();
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        
+        for (Cliente c : clientes) {
+            comboCliente.addItem(new ClienteCombo(c));
+        }
+    }
+    
+    private void carregarEquipamentoSelecionado() {
+        int row = tabelaEquipamentos.getSelectedRow();
+        if (row >= 0) {
+            int id = (int) tableModel.getValueAt(row, 0);
+            Equipamento e = equipamentoDAO.buscarPorId(id);
+            if (e != null) {
+                txtId.setText(String.valueOf(e.getId()));
+                txtMarca.setText(e.getMarca());
+                txtModelo.setText(e.getModelo());
+                txtTensaoNominal.setText(String.valueOf(e.getTensaoNominal()));
+                
+                // Selecionar cliente no combo
+                for (int i = 0; i < comboCliente.getItemCount(); i++) {
+                    ClienteCombo cc = comboCliente.getItemAt(i);
+                    if (cc.getCliente().getId() == e.getIdCliente()) {
+                        comboCliente.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    private void inserirEquipamento() {
+        if (!validarCampos()) return;
+        
+        Equipamento equipamento = new Equipamento();
+        preencherEquipamento(equipamento);
+        
+        if (equipamentoDAO.inserir(equipamento)) {
+            JOptionPane.showMessageDialog(this, "Equipamento inserido com sucesso!");
+            carregarEquipamentos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao inserir equipamento!\nVerifique se a tensão está entre 1 e 1500V.", 
+                                        "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void atualizarEquipamento() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um equipamento para atualizar!");
+            return;
+        }
+        
+        if (!validarCampos()) return;
+        
+        Equipamento equipamento = new Equipamento();
+        equipamento.setId(Integer.parseInt(txtId.getText()));
+        preencherEquipamento(equipamento);
+        
+        if (equipamentoDAO.atualizar(equipamento)) {
+            JOptionPane.showMessageDialog(this, "Equipamento atualizado com sucesso!");
+            carregarEquipamentos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar equipamento!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void excluirEquipamento() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um equipamento para excluir!");
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Deseja realmente excluir este equipamento?\nTodas as OS associadas serão afetadas!",
+            "Confirmar exclusão", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            int id = Integer.parseInt(txtId.getText());
+            if (equipamentoDAO.excluir(id)) {
+                JOptionPane.showMessageDialog(this, "Equipamento excluído com sucesso!");
+                carregarEquipamentos();
+                limparFormulario();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao excluir equipamento!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void preencherEquipamento(Equipamento equipamento) {
+        equipamento.setMarca(txtMarca.getText().trim());
+        equipamento.setModelo(txtModelo.getText().trim());
+        equipamento.setTensaoNominal(Double.parseDouble(txtTensaoNominal.getText().trim()));
+        
+        ClienteCombo selected = (ClienteCombo) comboCliente.getSelectedItem();
+        if (selected != null) {
+            equipamento.setIdCliente(selected.getCliente().getId());
+        }
+    }
+    
+    private boolean validarCampos() {
+        String marca = txtMarca.getText().trim();
+        String modelo = txtModelo.getText().trim();
+        String tensaoStr = txtTensaoNominal.getText().trim();
+        
+        if (marca.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Marca é obrigatória!");
+            txtMarca.requestFocus();
+            return false;
+        }
+        
+        if (modelo.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Modelo é obrigatório!");
+            txtModelo.requestFocus();
+            return false;
+        }
+        
+        try {
+            double tensao = Double.parseDouble(tensaoStr);
+            if (tensao < 1 || tensao > 1500) {
+                JOptionPane.showMessageDialog(this, "Tensão nominal deve estar entre 1 e 1500 volts!");
+                txtTensaoNominal.requestFocus();
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Tensão nominal deve ser um número válido!");
+            txtTensaoNominal.requestFocus();
+            return false;
+        }
+        
+        if (comboCliente.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return false;
+        }
+        
+        return true;
+    }
+    
+    private void limparFormulario() {
+        txtId.setText("");
+        txtMarca.setText("");
+        txtModelo.setText("");
+        txtTensaoNominal.setText("");
+        if (comboCliente.getItemCount() > 0) {
+            comboCliente.setSelectedIndex(0);
+        }
+        txtMarca.requestFocus();
+    }
+    
+    // Classe auxiliar para combo de clientes
+    private class ClienteCombo {
+        private Cliente cliente;
+        
+        public ClienteCombo(Cliente cliente) {
+            this.cliente = cliente;
+        }
+        
+        public Cliente getCliente() {
+            return cliente;
+        }
+        
+        @Override
+        public String toString() {
+            return cliente.getNomeExibicao();
+        }
+    }
+}

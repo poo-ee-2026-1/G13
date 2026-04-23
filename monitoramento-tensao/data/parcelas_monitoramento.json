@@ -1,0 +1,97 @@
+[ {
+  "id" : 1,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 1,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-05-22T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 2,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 2,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-06-21T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 3,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 3,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-07-21T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 4,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 4,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-08-20T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 5,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 5,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-09-19T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 6,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 6,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-10-19T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 7,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 7,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-11-18T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 8,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 8,
+  "valor" : 250.0,
+  "dataVencimento" : "2026-12-18T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 9,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 9,
+  "valor" : 250.0,
+  "dataVencimento" : "2027-01-17T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 10,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 10,
+  "valor" : 250.0,
+  "dataVencimento" : "2027-02-16T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 11,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 11,
+  "valor" : 250.0,
+  "dataVencimento" : "2027-03-18T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+}, {
+  "id" : 12,
+  "idOrdemServico" : 7,
+  "numeroParcela" : 12,
+  "valor" : 250.0,
+  "dataVencimento" : "2027-04-17T21:06:43.486+00:00",
+  "status" : "PENDENTE",
+  "dataPagamento" : null
+} ]

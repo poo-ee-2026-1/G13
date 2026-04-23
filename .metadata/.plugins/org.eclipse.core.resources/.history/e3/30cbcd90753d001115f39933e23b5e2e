@@ -1,0 +1,294 @@
+// OrdemServicoDAO.java
+package com.monitoramento.dao;
+
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.InstalacaoProduto;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class OrdemServicoDAO {
+    private static final String FILE_NAME = "ordens_servico.json";
+    private List<OrdemServico> ordens;
+    
+    public OrdemServicoDAO() {
+        carregarOrdens();
+    }
+    
+    private void carregarOrdens() {
+        ordens = DatabaseConnection.carregarLista(FILE_NAME, OrdemServico.class);
+        if (ordens == null) {
+            ordens = new ArrayList<>();
+        }
+        System.out.println("Carregadas " + ordens.size() + " ordens de serviço");
+    }
+    
+    private void salvarOrdens() {
+        DatabaseConnection.salvarLista(FILE_NAME, ordens);
+        System.out.println("Salvas " + ordens.size() + " ordens de serviço");
+    }
+    
+    public boolean inserir(OrdemServico os) {
+        os.setId(DatabaseConnection.gerarNovoId(ordens));
+        ordens.add(os);
+        salvarOrdens();
+        return true;
+    }
+    
+    public boolean atualizar(OrdemServico os) {
+        for (int i = 0; i < ordens.size(); i++) {
+            if (ordens.get(i).getId() == os.getId()) {
+                ordens.set(i, os);
+                salvarOrdens();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public boolean excluir(int id) {
+        boolean removido = ordens.removeIf(o -> o.getId() == id);
+        if (removido) {
+            salvarOrdens();
+        }
+        return removido;
+    }
+    
+    public OrdemServico buscarPorId(int id) {
+        return ordens.stream()
+            .filter(o -> o.getId() == id)
+            .findFirst()
+            .orElse(null);
+    }
+    
+    public List<OrdemServico> listarTodas() {
+        return ordens.stream()
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    // MÉTODOS PARA ORDENS DE INSTALAÇÃO
+    
+    public List<OrdemServico> listarOrdensInstalacao() {
+        return ordens.stream()
+            .filter(o -> o.isInstalacao())
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarOrdensInstalacaoPorStatus(String status) {
+        return ordens.stream()
+            .filter(o -> o.isInstalacao() && o.getStatus() != null && o.getStatus().equals(status))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarOrdensInstalacaoPorCliente(int idCliente) {
+        return ordens.stream()
+            .filter(o -> o.isInstalacao() && o.getIdCliente() == idCliente)
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public boolean concluirInstalacao(int id, String observacoes, int idUsuario) {
+        OrdemServico os = buscarPorId(id);
+        if (os != null && os.isInstalacao() && "ABERTA".equals(os.getStatus())) {
+            os.setStatus("FECHADA");
+            os.setObservacoes(observacoes);
+            os.setDataFechamento(new Date());
+            os.setIdUsuarioFechamento(idUsuario);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    // Método para adicionar produto a uma OS de instalação
+    public boolean adicionarProdutoInstalacao(int idOrdem, InstalacaoProduto produto) {
+        OrdemServico os = buscarPorId(idOrdem);
+        if (os != null && os.isInstalacao()) {
+            os.adicionarProdutoInstalacao(produto);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    // Método para adicionar múltiplos produtos
+    public boolean adicionarProdutosInstalacao(int idOrdem, List<InstalacaoProduto> produtos) {
+        OrdemServico os = buscarPorId(idOrdem);
+        if (os != null && os.isInstalacao()) {
+            for (InstalacaoProduto p : produtos) {
+                os.adicionarProdutoInstalacao(p);
+            }
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    // Método para remover produto
+    public boolean removerProdutoInstalacao(int idOrdem, int index) {
+        OrdemServico os = buscarPorId(idOrdem);
+        if (os != null && os.isInstalacao()) {
+            os.removerProdutoInstalacao(index);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    // MÉTODOS DE ESTATÍSTICAS PARA INSTALAÇÕES
+    
+    public Map<String, Double> getEstatisticasInstalacoes() {
+        Map<String, Double> estatisticas = new HashMap<>();
+        
+        List<OrdemServico> instalacoes = listarOrdensInstalacao();
+        
+        long total = instalacoes.size();
+        long abertas = instalacoes.stream().filter(o -> "ABERTA".equals(o.getStatus())).count();
+        long fechadas = instalacoes.stream().filter(o -> "FECHADA".equals(o.getStatus())).count();
+        
+        double valorTotal = instalacoes.stream().mapToDouble(OrdemServico::getValorTotal).sum();
+        int totalProdutos = instalacoes.stream().mapToInt(OrdemServico::getQuantidadeProdutos).sum();
+        
+        estatisticas.put("total", (double) total);
+        estatisticas.put("abertas", (double) abertas);
+        estatisticas.put("fechadas", (double) fechadas);
+        estatisticas.put("valorTotal", valorTotal);
+        estatisticas.put("totalProdutos", (double) totalProdutos);
+        
+        return estatisticas;
+    }
+    
+    // MÉTODOS EXISTENTES (mantidos para compatibilidade)
+    
+    public List<OrdemServico> listarPorTipoOs(String tipoOs) {
+        return ordens.stream()
+            .filter(o -> o.getTipoOs() != null && o.getTipoOs().equals(tipoOs))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarPorDepartamentoOrigem(String departamento) {
+        return ordens.stream()
+            .filter(o -> o.getDepartamentoOrigem() != null && o.getDepartamentoOrigem().equals(departamento))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarOsInformacao() {
+        return ordens.stream()
+            .filter(o -> "INFORMACAO".equals(o.getTipoOs()))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarOsReparo() {
+        return ordens.stream()
+            .filter(o -> "REPARO".equals(o.getTipoOs()))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> listarOsOrcamento() {
+        return ordens.stream()
+            .filter(o -> "ORCAMENTO".equals(o.getTipoOs()))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> buscarPorStatus(String status) {
+        return ordens.stream()
+            .filter(o -> o.getStatus() != null && o.getStatus().equals(status))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> buscarPorCliente(int idCliente) {
+        return ordens.stream()
+            .filter(o -> o.getIdCliente() == idCliente)
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> buscarOrdensAbertasPorCliente(int idCliente) {
+        return ordens.stream()
+            .filter(o -> o.getIdCliente() == idCliente && !"FECHADA".equals(o.getStatus()))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public boolean fecharOrdemServico(int id, String descricaoSolucao, String falhaIdentificada, int idUsuarioFechamento) {
+        OrdemServico os = buscarPorId(id);
+        if (os != null && "ABERTA".equals(os.getStatus())) {
+            os.setStatus("FECHADA");
+            os.setDescricaoSolucao(descricaoSolucao);
+            os.setFalhaIdentificada(falhaIdentificada);
+            os.setDataFechamento(new Date());
+            os.setIdUsuarioFechamento(idUsuarioFechamento);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    public boolean atualizarStatus(int id, String status) {
+        OrdemServico os = buscarPorId(id);
+        if (os != null) {
+            os.setStatus(status);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    public boolean atualizarNivel(int id, String novoNivel) {
+        OrdemServico os = buscarPorId(id);
+        if (os != null) {
+            os.setTipoNivel(novoNivel);
+            return atualizar(os);
+        }
+        return false;
+    }
+    
+    public List<OrdemServico> buscarPorPeriodo(Date dataInicio, Date dataFim) {
+        return ordens.stream()
+            .filter(o -> o.getDataAbertura() != null &&
+                        o.getDataAbertura().after(dataInicio) &&
+                        o.getDataAbertura().before(dataFim))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public List<OrdemServico> buscarPorNivel(String tipoNivel) {
+        return ordens.stream()
+            .filter(o -> o.getTipoNivel() != null && o.getTipoNivel().equals(tipoNivel))
+            .sorted((a, b) -> b.getDataAbertura().compareTo(a.getDataAbertura()))
+            .collect(Collectors.toList());
+    }
+    
+    public int contarOrdensPorPeriodo(Date dataInicio, Date dataFim) {
+        return (int) ordens.stream()
+            .filter(o -> o.getDataAbertura() != null &&
+                        o.getDataAbertura().after(dataInicio) &&
+                        o.getDataAbertura().before(dataFim))
+            .count();
+    }
+    
+    public double calcularTempoMedioResolucao(Date dataInicio, Date dataFim) {
+        return ordens.stream()
+            .filter(o -> "FECHADA".equals(o.getStatus()) &&
+                        o.getDataFechamento() != null &&
+                        o.getDataAbertura() != null &&
+                        o.getDataFechamento().after(dataInicio) &&
+                        o.getDataFechamento().before(dataFim))
+            .mapToDouble(o -> (o.getDataFechamento().getTime() - o.getDataAbertura().getTime()) / (1000.0 * 3600))
+            .average()
+            .orElse(0);
+    }
+    
+    public Map<String, Integer> getEstatisticasPorTipoOs() {
+        Map<String, Integer> estatisticas = new HashMap<>();
+        estatisticas.put("INFORMACAO", (int) ordens.stream().filter(o -> "INFORMACAO".equals(o.getTipoOs())).count());
+        estatisticas.put("REPARO", (int) ordens.stream().filter(o -> "REPARO".equals(o.getTipoOs())).count());
+        estatisticas.put("INSTALACAO", (int) ordens.stream().filter(o -> o.isInstalacao()).count());
+        estatisticas.put("ORCAMENTO", (int) ordens.stream().filter(o -> "ORCAMENTO".equals(o.getTipoOs())).count());
+        return estatisticas;
+    }
+}

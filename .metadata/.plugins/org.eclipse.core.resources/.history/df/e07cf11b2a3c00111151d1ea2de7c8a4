@@ -1,0 +1,178 @@
+package com.monitoramento.ui;
+
+import com.monitoramento.dao.*;
+import com.monitoramento.model.*;
+import com.monitoramento.service.MonitoramentoService;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaRelatorios extends JFrame {
+    private Usuario usuarioLogado;
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private UsuarioDAO usuarioDAO;
+    private OrdemServicoDAO ordemServicoDAO;
+    private MonitoramentoService monitoramentoService;
+    
+    private JTabbedPane tabbedPane;
+    private SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private SimpleDateFormat sdfData = new SimpleDateFormat("dd/MM/yyyy");
+    
+    public TelaRelatorios(Usuario usuario, MonitoramentoService monitoramentoService) {
+        this.usuarioLogado = usuario;
+        this.monitoramentoService = monitoramentoService;
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.usuarioDAO = new UsuarioDAO();
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        
+        initComponents();
+        setLocationRelativeTo(null);
+    }
+    
+    private void initComponents() {
+        setTitle("Relatórios do Sistema - Usuário: " + usuarioLogado.getLogin());
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setSize(1000, 700);
+        setLayout(new BorderLayout());
+        
+        tabbedPane = new JTabbedPane();
+        
+        // Abas de relatórios
+        tabbedPane.addTab("Usuários", criarPainelUsuarios());
+        tabbedPane.addTab("Clientes", criarPainelClientes());
+        tabbedPane.addTab("Equipamentos", criarPainelEquipamentos());
+        tabbedPane.addTab("Ordens de Serviço", criarPainelOrdensServico());
+        tabbedPane.addTab("Disponibilidade", criarPainelDisponibilidade());
+        
+        add(tabbedPane, BorderLayout.CENTER);
+        
+        // Botão fechar
+        JButton btnFechar = new JButton("Fechar");
+        btnFechar.addActionListener(e -> dispose());
+        JPanel panelBotoes = new JPanel();
+        panelBotoes.add(btnFechar);
+        add(panelBotoes, BorderLayout.SOUTH);
+    }
+    
+    private JPanel criarPainelUsuarios() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Tabela
+        String[] colunas = {"ID", "Nome", "CPF", "Matrícula", "Função", "Login", "Data Cadastro"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0);
+        JTable tabela = new JTable(model);
+        
+        // Carregar dados
+        List<Usuario> usuarios = usuarioDAO.listarTodos();
+        for (Usuario u : usuarios) {
+            Object[] row = {
+                u.getId(), u.getNomeCompleto(), u.getCpf(), u.getMatricula(),
+                u.getFuncao(), u.getLogin(), 
+                u.getDataCadastro() != null ? sdf.format(u.getDataCadastro()) : ""
+            };
+            model.addRow(row);
+        }
+        
+        JScrollPane scroll = new JScrollPane(tabela);
+        panel.add(scroll, BorderLayout.CENTER);
+        
+        // Botão exportar
+        JButton btnExportar = new JButton("Exportar CSV");
+        btnExportar.addActionListener(e -> exportarCSV(tabela, "usuarios"));
+        JPanel panelExport = new JPanel();
+        panelExport.add(btnExportar);
+        panel.add(panelExport, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelClientes() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        String[] colunas = {"ID", "Tipo", "Documento", "Nome/Razão", "Telefone", "IP", "Monitoramento", "Data Cadastro"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0);
+        JTable tabela = new JTable(model);
+        
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            String nomeExibicao = c.getTipo().equals("FISICA") ? 
+                c.getNome() + " " + c.getSobrenome() : c.getRazaoSocial();
+            
+            Object[] row = {
+                c.getId(), c.getTipo().equals("FISICA") ? "PF" : "PJ", c.getDocumento(),
+                nomeExibicao, c.getTelefoneCompleto(), c.getIpCliente(),
+                c.isEmMonitoramento() ? "SIM" : "NÃO",
+                c.getDataCadastro() != null ? sdf.format(c.getDataCadastro()) : ""
+            };
+            model.addRow(row);
+        }
+        
+        JScrollPane scroll = new JScrollPane(tabela);
+        panel.add(scroll, BorderLayout.CENTER);
+        
+        JButton btnExportar = new JButton("Exportar CSV");
+        btnExportar.addActionListener(e -> exportarCSV(tabela, "clientes"));
+        JPanel panelExport = new JPanel();
+        panelExport.add(btnExportar);
+        panel.add(panelExport, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelEquipamentos() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        String[] colunas = {"ID", "Marca", "Modelo", "Tensão Nominal", "Cliente", "Data Cadastro"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0);
+        JTable tabela = new JTable(model);
+        
+        List<Equipamento> equipamentos = equipamentoDAO.listarTodos();
+        for (Equipamento e : equipamentos) {
+            Cliente cliente = clienteDAO.buscarPorId(e.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            Object[] row = {
+                e.getId(), e.getMarca(), e.getModelo(), 
+                String.format("%.2f V", e.getTensaoNominal()),
+                nomeCliente, ""
+            };
+            model.addRow(row);
+        }
+        
+        JScrollPane scroll = new JScrollPane(tabela);
+        panel.add(scroll, BorderLayout.CENTER);
+        
+        JButton btnExportar = new JButton("Exportar CSV");
+        btnExportar.addActionListener(e -> exportarCSV(tabela, "equipamentos"));
+        JPanel panelExport = new JPanel();
+        panelExport.add(btnExportar);
+        panel.add(panelExport, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelOrdensServico() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Filtros
+        JPanel panelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        
+        JComboBox<String> comboTipo = new JComboBox<>(new String[]{"Todas", "1º Nível", "2º Nível"});
+        JComboBox<String> comboStatus = new JComboBox<>(new String[]{"Todas", "ABERTA", "FECHADA"});
+        JButton btnFiltrar = new JButton("Filtrar");
+        
+        panelFiltros.add(new JLabel("Tipo:"));
+        panelFiltros.add(comboTipo);
+        panelFiltros.add(new JLabel("Status:"));
+        panelFiltros.add(comboStatus);
+        panelFiltros.add(btnFiltrar);
+        
+        // Tabela
+        String[] colunas = {"ID", "Cliente", "Equipamento", "Nível", "Status", "Motivo", 
+                           "Data Abertura", "Data Fechamento", "Falha

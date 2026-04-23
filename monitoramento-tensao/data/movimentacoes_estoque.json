@@ -1,0 +1,49 @@
+[ {
+  "id" : 1,
+  "idProduto" : 1,
+  "tipo" : "RESERVA",
+  "motivo" : "RESERVA_ORCAMENTO",
+  "quantidade" : 1,
+  "precoUnitario" : 10.0,
+  "valorTotal" : 10.0,
+  "dataMovimento" : "2026-04-22T21:05:28.844+00:00",
+  "idUsuario" : 1,
+  "idReferencia" : 1,
+  "observacao" : "Orçamento #1 - RESERVA_ORCAMENTO"
+}, {
+  "id" : 2,
+  "idProduto" : 1,
+  "tipo" : "SAIDA",
+  "motivo" : "VENDA",
+  "quantidade" : 1,
+  "precoUnitario" : 10.0,
+  "valorTotal" : 10.0,
+  "dataMovimento" : "2026-04-22T21:05:33.718+00:00",
+  "idUsuario" : 1,
+  "idReferencia" : 1,
+  "observacao" : "Orçamento #1 aprovado"
+}, {
+  "id" : 3,
+  "idProduto" : 1,
+  "tipo" : "RESERVA",
+  "motivo" : "RESERVA_ORCAMENTO",
+  "quantidade" : 1,
+  "precoUnitario" : 10.0,
+  "valorTotal" : 10.0,
+  "dataMovimento" : "2026-04-22T21:06:22.204+00:00",
+  "idUsuario" : 1,
+  "idReferencia" : 2,
+  "observacao" : "Orçamento #2 - RESERVA_ORCAMENTO"
+}, {
+  "id" : 4,
+  "idProduto" : 1,
+  "tipo" : "CANCELAMENTO_RESERVA",
+  "motivo" : "REJEICAO",
+  "quantidade" : 1,
+  "precoUnitario" : 10.0,
+  "valorTotal" : 10.0,
+  "dataMovimento" : "2026-04-22T21:06:30.418+00:00",
+  "idUsuario" : 1,
+  "idReferencia" : 2,
+  "observacao" : "Orçamento #2 rejeitado - Motivo: Teste"
+} ]

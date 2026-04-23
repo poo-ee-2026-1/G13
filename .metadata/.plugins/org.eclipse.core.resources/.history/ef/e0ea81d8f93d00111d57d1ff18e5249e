@@ -1,0 +1,100 @@
+package com.monitoramento;
+
+import com.monitoramento.service.MonitoramentoService;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.service.WebSocketServer;
+import com.monitoramento.ui.TelaLogin;
+import com.monitoramento.dao.DepartamentoDAO;
+import com.monitoramento.dao.FuncaoDAO;
+import com.monitoramento.dao.UsuarioDAO;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.util.DatabaseConnection;
+
+import javax.swing.SwingUtilities;
+
+public class Main {
+    private static WebSocketServer webSocketServer;
+    private static MonitoramentoService monitoramentoService;
+    private static OrdemServicoService ordemServicoService;
+    
+    public static void main(String[] args) {
+        // Inicializar sistema de arquivos JSON
+        DatabaseConnection.inicializarArquivos();
+        
+        // Inicializar serviços
+        monitoramentoService = new MonitoramentoService();
+        ordemServicoService = new OrdemServicoService(monitoramentoService);
+        
+        // Inicializar departamentos padrão
+        DepartamentoDAO deptDAO = new DepartamentoDAO();
+        deptDAO.inicializarDepartamentosPadrao();
+        
+        // Inicializar funções padrão
+        FuncaoDAO funcaoDAO = new FuncaoDAO();
+        funcaoDAO.inicializarFuncoesPadrao();
+        
+        // Inicializar usuário admin padrão se não existir
+        inicializarUsuarioAdmin();
+        
+        // Iniciar WebSocket Server em thread separada
+        iniciarWebSocketServer();
+        
+        // Iniciar interface gráfica
+        SwingUtilities.invokeLater(() -> {
+            new TelaLogin().setVisible(true);
+        });
+        
+        // Adicionar hook para desligamento gracioso
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Desligando sistema...");
+            if (webSocketServer != null) {
+                webSocketServer.pararServidor();
+            }
+            DatabaseConnection.closeConnection();
+        }));
+    }
+    
+    private static void iniciarWebSocketServer() {
+        Thread websocketThread = new Thread(() -> {
+            try {
+                webSocketServer = new WebSocketServer(monitoramentoService);
+                webSocketServer.start();
+                System.out.println("WebSocket Server iniciado na porta 8080");
+            } catch (Exception e) {
+                System.err.println("Erro ao iniciar WebSocket Server: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+        websocketThread.setDaemon(true);
+        websocketThread.start();
+    }
+    
+    private static void inicializarUsuarioAdmin() {
+        UsuarioDAO usuarioDAO = new UsuarioDAO();
+        if (usuarioDAO.listarTodos().isEmpty()) {
+            Usuario admin = new Usuario();
+            admin.setNome("Administrador");
+            admin.setSobrenome("Sistema");
+            admin.setCpf("00000000000");
+            admin.setMatricula("ADMIN001");
+            admin.setFuncao("Administrador");
+            admin.setDepartamento("ADMINISTRAÇÃO");
+            admin.setLogin("admin");
+            admin.setSenha("admin123");
+            usuarioDAO.inserir(admin);
+            System.out.println("Usuário admin criado: admin / admin123");
+        }
+    }
+    
+    public static WebSocketServer getWebSocketServer() {
+        return webSocketServer;
+    }
+    
+    public static MonitoramentoService getMonitoramentoService() {
+        return monitoramentoService;
+    }
+    
+    public static OrdemServicoService getOrdemServicoService() {
+        return ordemServicoService;
+    }
+}

@@ -1,0 +1,1015 @@
+// TelaOrcamento.java - VERSÃO CORRIGIDA COMPLETA
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.model.ProdutoEstoque;
+import com.monitoramento.model.MovimentacaoEstoque;
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.InstalacaoProduto;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.ProdutoEstoqueDAO;
+import com.monitoramento.dao.MovimentacaoEstoqueDAO;
+import com.monitoramento.dao.OrdemServicoDAO;
+import com.monitoramento.dao.InstalacaoProdutoDAO;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.border.TitledBorder;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaOrcamento extends JPanel {
+    private ClienteDAO clienteDAO;
+    private ProdutoEstoqueDAO produtoDAO;
+    private MovimentacaoEstoqueDAO movimentacaoDAO;
+    private OrdemServicoDAO ordemServicoDAO;
+    private InstalacaoProdutoDAO instalacaoProdutoDAO;
+    private OrdemServicoService osService;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOrcamentos;
+    private DefaultTableModel modelOrcamentos;
+    private JComboBox<String> comboClienteOrcamento, comboStatusOrcamento;
+    private JButton btnFiltrar, btnLimpar;
+    private JButton btnAprovar, btnRejeitar, btnConverterInstalacao;
+    
+    // Componentes do formulário de novo orçamento
+    private JComboBox<String> comboClienteNovo;
+    private JTextArea txtDescricaoOrcamento;
+    private JTable tabelaProdutosOrcamento;
+    private DefaultTableModel modelProdutosOrcamento;
+    private JButton btnAdicionarProduto, btnRemoverProduto;
+    private JLabel lblTotalOrcamento;
+    private List<ProdutoOrcamento> produtosSelecionados;
+    private JButton btnSalvarOrcamento;
+    
+    private List<Map<String, Object>> orcamentos;
+    private int nextId = 1;
+    
+    // Cores para melhor visualização
+    private static final Color COR_TITULO = new Color(0, 100, 0);
+    private static final Color COR_TOTAL = new Color(0, 100, 0);
+    private static final Color COR_BOTAO_SALVAR = new Color(60, 120, 60);
+    private static final Color COR_BOTAO_ADICIONAR = new Color(70, 130, 180);
+    private static final Color COR_BOTAO_REMOVER = new Color(180, 60, 60);
+    
+    public TelaOrcamento(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.clienteDAO = new ClienteDAO();
+        this.produtoDAO = new ProdutoEstoqueDAO();
+        this.movimentacaoDAO = new MovimentacaoEstoqueDAO();
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        this.instalacaoProdutoDAO = new InstalacaoProdutoDAO();
+        this.osService = Main.getOrdemServicoService();
+        this.produtosSelecionados = new ArrayList<>();
+        this.orcamentos = new ArrayList<>();
+        
+        initComponents();
+        carregarOrcamentos();
+        carregarClientesCombo();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // ========== TOOLBAR SUPERIOR ==========
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        toolBar.setBackground(new Color(240, 240, 240));
+        
+        JButton btnAtualizarOrcamentos = new JButton("Atualizar");
+        btnAtualizarOrcamentos.addActionListener(e -> carregarOrcamentos());
+        toolBar.add(btnAtualizarOrcamentos);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        // ========== PAINEL DE FILTROS ==========
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.GRAY), 
+            "Filtrar Orçamentos", 
+            TitledBorder.LEFT, 
+            TitledBorder.TOP,
+            new Font("Arial", Font.BOLD, 12),
+            Color.BLUE
+        ));
+        
+        painelFiltros.add(new JLabel("Status:"));
+        comboStatusOrcamento = new JComboBox<>(new String[]{"TODOS", "PENDENTE", "APROVADO", "REJEITADO"});
+        comboStatusOrcamento.setPreferredSize(new Dimension(120, 25));
+        
+        painelFiltros.add(Box.createHorizontalStrut(15));
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboClienteOrcamento = new JComboBox<>();
+        comboClienteOrcamento.setPreferredSize(new Dimension(250, 25));
+        
+        btnFiltrar = new JButton("Filtrar");
+        btnLimpar = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarOrcamentos());
+        btnLimpar.addActionListener(e -> {
+            comboStatusOrcamento.setSelectedIndex(0);
+            comboClienteOrcamento.setSelectedIndex(0);
+            carregarOrcamentos();
+        });
+        
+        painelFiltros.add(comboStatusOrcamento);
+        painelFiltros.add(comboClienteOrcamento);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        // ========== TABELA DE ORÇAMENTOS ==========
+        String[] colunasOrcamentos = {"ID", "Cliente", "Descrição", "Valor (R$)", "Status", "Data", "Produtos"};
+        modelOrcamentos = new DefaultTableModel(colunasOrcamentos, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOrcamentos = new JTable(modelOrcamentos);
+        tabelaOrcamentos.setRowHeight(25);
+        tabelaOrcamentos.setFont(new Font("Arial", Font.PLAIN, 12));
+        tabelaOrcamentos.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                carregarDetalhesOrcamento();
+            }
+        });
+        
+        // Ajustar largura das colunas
+        tabelaOrcamentos.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaOrcamentos.getColumnModel().getColumn(1).setPreferredWidth(200);
+        tabelaOrcamentos.getColumnModel().getColumn(2).setPreferredWidth(250);
+        tabelaOrcamentos.getColumnModel().getColumn(3).setPreferredWidth(100);
+        tabelaOrcamentos.getColumnModel().getColumn(4).setPreferredWidth(100);
+        tabelaOrcamentos.getColumnModel().getColumn(5).setPreferredWidth(100);
+        tabelaOrcamentos.getColumnModel().getColumn(6).setPreferredWidth(80);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaOrcamentos);
+        scrollTabela.setBorder(BorderFactory.createTitledBorder("Lista de Orçamentos"));
+        
+        // ========== PAINEL DE NOVO ORÇAMENTO (REFORMULADO) ==========
+        JPanel painelNovoOrcamento = criarPainelNovoOrcamento();
+        
+        // ========== PAINEL DE AÇÕES ==========
+        JPanel painelAcoes = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelAcoes.setBorder(BorderFactory.createTitledBorder("Ações do Orçamento Selecionado"));
+        
+        btnAprovar = new JButton("✓ Aprovar Orçamento");
+        btnRejeitar = new JButton("✗ Rejeitar Orçamento");
+        btnConverterInstalacao = new JButton("↻ Converter em Instalação");
+        
+        // Definir tamanho padrão para todos os botões de ação
+        Dimension botaoAcaoSize = new Dimension(180, 35);
+        btnAprovar.setPreferredSize(botaoAcaoSize);
+        btnRejeitar.setPreferredSize(botaoAcaoSize);
+        btnConverterInstalacao.setPreferredSize(botaoAcaoSize);
+        
+        btnAprovar.setBackground(new Color(60, 120, 60));
+        btnAprovar.setForeground(Color.WHITE);
+        btnAprovar.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnRejeitar.setBackground(new Color(180, 60, 60));
+        btnRejeitar.setForeground(Color.WHITE);
+        btnRejeitar.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnConverterInstalacao.setBackground(new Color(255, 140, 0));
+        btnConverterInstalacao.setForeground(Color.WHITE);
+        btnConverterInstalacao.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnAprovar.addActionListener(e -> aprovarOrcamento());
+        btnRejeitar.addActionListener(e -> rejeitarOrcamento());
+        btnConverterInstalacao.addActionListener(e -> converterParaInstalacao());
+        
+        painelAcoes.add(btnAprovar);
+        painelAcoes.add(btnRejeitar);
+        painelAcoes.add(btnConverterInstalacao);
+        
+        // ========== ORGANIZAÇÃO DO LAYOUT PRINCIPAL ==========
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelFiltros, BorderLayout.CENTER);
+        
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.45);
+        splitPane.setTopComponent(scrollTabela);
+        splitPane.setBottomComponent(painelNovoOrcamento);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(splitPane, BorderLayout.CENTER);
+        add(painelAcoes, BorderLayout.SOUTH);
+    }
+    
+    /**
+     * Cria o painel de novo orçamento com layout melhorado
+     */
+    private JPanel criarPainelNovoOrcamento() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(COR_TITULO, 2),
+            "NOVO ORÇAMENTO",
+            TitledBorder.LEFT,
+            TitledBorder.TOP,
+            new Font("Arial", Font.BOLD, 14),
+            COR_TITULO
+        ));
+        
+        // ========== PAINEL DE DADOS PRINCIPAIS ==========
+        JPanel painelDadosPrincipais = new JPanel(new GridBagLayout());
+        painelDadosPrincipais.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        // Linha 1: Cliente
+        gbc.gridx = 0; gbc.gridy = 0;
+        gbc.weightx = 0;
+        JLabel lblCliente = new JLabel("Cliente:*");
+        lblCliente.setFont(new Font("Arial", Font.BOLD, 12));
+        painelDadosPrincipais.add(lblCliente, gbc);
+        
+        comboClienteNovo = new JComboBox<>();
+        comboClienteNovo.setPreferredSize(new Dimension(300, 30));
+        comboClienteNovo.setFont(new Font("Arial", Font.PLAIN, 12));
+        gbc.gridx = 1; gbc.gridwidth = 3;
+        gbc.weightx = 1;
+        painelDadosPrincipais.add(comboClienteNovo, gbc);
+        
+        // Linha 2: Descrição
+        gbc.gridx = 0; gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0;
+        JLabel lblDescricao = new JLabel("Descrição:*");
+        lblDescricao.setFont(new Font("Arial", Font.BOLD, 12));
+        painelDadosPrincipais.add(lblDescricao, gbc);
+        
+        txtDescricaoOrcamento = new JTextArea(3, 50);
+        txtDescricaoOrcamento.setLineWrap(true);
+        txtDescricaoOrcamento.setWrapStyleWord(true);
+        txtDescricaoOrcamento.setFont(new Font("Arial", Font.PLAIN, 12));
+        txtDescricaoOrcamento.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        JScrollPane scrollDesc = new JScrollPane(txtDescricaoOrcamento);
+        scrollDesc.setPreferredSize(new Dimension(0, 70));
+        gbc.gridx = 1; gbc.gridwidth = 3;
+        gbc.weightx = 1;
+        painelDadosPrincipais.add(scrollDesc, gbc);
+        
+        // ========== PAINEL DE PRODUTOS ==========
+        JPanel painelProdutos = new JPanel(new BorderLayout());
+        painelProdutos.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.GRAY),
+            "Produtos do Orçamento",
+            TitledBorder.LEFT,
+            TitledBorder.TOP,
+            new Font("Arial", Font.BOLD, 12),
+            new Color(70, 130, 180)
+        ));
+        
+        // Tabela de produtos
+        String[] colunasProdutos = {"Produto", "Quantidade", "Preço Unitário (R$)", "Subtotal (R$)"};
+        modelProdutosOrcamento = new DefaultTableModel(colunasProdutos, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaProdutosOrcamento = new JTable(modelProdutosOrcamento);
+        tabelaProdutosOrcamento.setRowHeight(25);
+        tabelaProdutosOrcamento.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        // Ajustar largura das colunas
+        tabelaProdutosOrcamento.getColumnModel().getColumn(0).setPreferredWidth(300);
+        tabelaProdutosOrcamento.getColumnModel().getColumn(1).setPreferredWidth(80);
+        tabelaProdutosOrcamento.getColumnModel().getColumn(2).setPreferredWidth(120);
+        tabelaProdutosOrcamento.getColumnModel().getColumn(3).setPreferredWidth(120);
+        
+        JScrollPane scrollProdutos = new JScrollPane(tabelaProdutosOrcamento);
+        scrollProdutos.setPreferredSize(new Dimension(0, 150));
+        
+        // Botões de produtos
+        JPanel painelBotoesProdutos = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        
+        btnAdicionarProduto = new JButton("+ Adicionar Produto");
+        btnAdicionarProduto.setBackground(COR_BOTAO_ADICIONAR);
+        btnAdicionarProduto.setForeground(Color.WHITE);
+        btnAdicionarProduto.setFont(new Font("Arial", Font.BOLD, 11));
+        btnAdicionarProduto.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        btnRemoverProduto = new JButton("- Remover Produto");
+        btnRemoverProduto.setBackground(COR_BOTAO_REMOVER);
+        btnRemoverProduto.setForeground(Color.WHITE);
+        btnRemoverProduto.setFont(new Font("Arial", Font.BOLD, 11));
+        btnRemoverProduto.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        btnAdicionarProduto.addActionListener(e -> adicionarProduto());
+        btnRemoverProduto.addActionListener(e -> removerProduto());
+        
+        painelBotoesProdutos.add(btnAdicionarProduto);
+        painelBotoesProdutos.add(btnRemoverProduto);
+        
+        painelProdutos.add(scrollProdutos, BorderLayout.CENTER);
+        painelProdutos.add(painelBotoesProdutos, BorderLayout.SOUTH);
+        
+        // ========== PAINEL DE TOTAL ==========
+        JPanel painelTotal = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        painelTotal.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        painelTotal.setBackground(new Color(250, 250, 250));
+        
+        JLabel lblTotalTexto = new JLabel("VALOR TOTAL DO ORÇAMENTO:");
+        lblTotalTexto.setFont(new Font("Arial", Font.BOLD, 14));
+        lblTotalTexto.setForeground(COR_TOTAL);
+        
+        lblTotalOrcamento = new JLabel("R$ 0,00");
+        lblTotalOrcamento.setFont(new Font("Arial", Font.BOLD, 16));
+        lblTotalOrcamento.setForeground(COR_TOTAL);
+        
+        painelTotal.add(lblTotalTexto);
+        painelTotal.add(Box.createHorizontalStrut(10));
+        painelTotal.add(lblTotalOrcamento);
+        
+        // ========== BOTÃO SALVAR ==========
+        JPanel painelBotaoSalvar = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        painelBotaoSalvar.setBorder(BorderFactory.createEmptyBorder(10, 10, 15, 10));
+        
+        btnSalvarOrcamento = new JButton("✓ SALVAR ORÇAMENTO");
+        // Botão Salvar com o MESMO TAMANHO dos botões de ação (Aprovar/Rejeitar/Converter)
+        btnSalvarOrcamento.setPreferredSize(new Dimension(180, 35));
+        btnSalvarOrcamento.setBackground(COR_BOTAO_SALVAR);
+        btnSalvarOrcamento.setForeground(Color.WHITE);
+        btnSalvarOrcamento.setFont(new Font("Arial", Font.BOLD, 12));
+        btnSalvarOrcamento.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnSalvarOrcamento.addActionListener(e -> salvarOrcamento());
+        
+        painelBotaoSalvar.add(btnSalvarOrcamento);
+        
+        // ========== MONTAGEM DO PAINEL PRINCIPAL ==========
+        JPanel painelConteudo = new JPanel(new BorderLayout());
+        painelConteudo.add(painelDadosPrincipais, BorderLayout.NORTH);
+        painelConteudo.add(painelProdutos, BorderLayout.CENTER);
+        painelConteudo.add(painelTotal, BorderLayout.SOUTH);
+        
+        panel.add(painelConteudo, BorderLayout.CENTER);
+        panel.add(painelBotaoSalvar, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void carregarClientesCombo() {
+        carregarClientesCombo(comboClienteOrcamento);
+        carregarClientesCombo(comboClienteNovo);
+    }
+    
+    private void carregarClientesCombo(JComboBox<String> combo) {
+        combo.removeAllItems();
+        combo.addItem("SELECIONE UM CLIENTE");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            combo.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private void carregarOrcamentos() {
+        modelOrcamentos.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (Map<String, Object> o : orcamentos) {
+            int qtdProdutos = 0;
+            List<Map<String, Object>> produtos = (List<Map<String, Object>>) o.get("produtos");
+            if (produtos != null) {
+                qtdProdutos = produtos.size();
+            }
+            
+            Object[] row = {
+                o.get("id"),
+                o.get("cliente"),
+                o.get("descricao"),
+                String.format("%.2f", o.get("valor")),
+                o.get("status"),
+                sdf.format((Date) o.get("data")),
+                qtdProdutos + " itens"
+            };
+            modelOrcamentos.addRow(row);
+        }
+    }
+    
+    private void filtrarOrcamentos() {
+        String status = (String) comboStatusOrcamento.getSelectedItem();
+        String clienteSelecionado = (String) comboClienteOrcamento.getSelectedItem();
+        
+        modelOrcamentos.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (Map<String, Object> o : orcamentos) {
+            if (!"TODOS".equals(status) && !status.equals(o.get("status"))) continue;
+            if (clienteSelecionado != null && !"TODOS".equals(clienteSelecionado) && !"SELECIONE UM CLIENTE".equals(clienteSelecionado)) {
+                String clienteNome = (String) o.get("cliente");
+                if (!clienteNome.contains(clienteSelecionado.split(" - ")[1])) continue;
+            }
+            
+            int qtdProdutos = 0;
+            List<Map<String, Object>> produtos = (List<Map<String, Object>>) o.get("produtos");
+            if (produtos != null) {
+                qtdProdutos = produtos.size();
+            }
+            
+            Object[] row = {
+                o.get("id"),
+                o.get("cliente"),
+                o.get("descricao"),
+                String.format("%.2f", o.get("valor")),
+                o.get("status"),
+                sdf.format((Date) o.get("data")),
+                qtdProdutos + " itens"
+            };
+            modelOrcamentos.addRow(row);
+        }
+    }
+    
+    private void carregarDetalhesOrcamento() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row >= 0) {
+            int id = (int) modelOrcamentos.getValueAt(row, 0);
+            for (Map<String, Object> o : orcamentos) {
+                if ((int) o.get("id") == id) {
+                    String status = (String) o.get("status");
+                    if ("APROVADO".equals(status) || "REJEITADO".equals(status)) {
+                        btnAprovar.setEnabled(false);
+                        btnRejeitar.setEnabled(false);
+                        btnConverterInstalacao.setEnabled("APROVADO".equals(status));
+                    } else {
+                        btnAprovar.setEnabled(true);
+                        btnRejeitar.setEnabled(true);
+                        btnConverterInstalacao.setEnabled(false);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    private void adicionarProduto() {
+        List<ProdutoEstoque> produtos = produtoDAO.listarAtivos();
+        
+        if (produtos.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Nenhum produto cadastrado no estoque!\nCadastre produtos primeiro.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Selecionar Produtos", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setSize(700, 500);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+        
+        String[] colunas = {"ID", "Código", "Nome", "Preço Venda (R$)", "Estoque", "Selecionar"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 5;
+            }
+            
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 5) return Boolean.class;
+                return super.getColumnClass(columnIndex);
+            }
+        };
+        
+        for (ProdutoEstoque p : produtos) {
+            Object[] row = {
+                p.getId(),
+                p.getCodigo(),
+                p.getNome(),
+                String.format("%.2f", p.getPrecoVenda()),
+                p.getQuantidade(),
+                Boolean.FALSE
+            };
+            model.addRow(row);
+        }
+        
+        JTable tabelaProdutos = new JTable(model);
+        tabelaProdutos.setRowHeight(25);
+        JScrollPane scroll = new JScrollPane(tabelaProdutos);
+        
+        JPanel painelBotoes = new JPanel();
+        JButton btnAdicionar = new JButton("Adicionar Selecionados");
+        JButton btnCancelar = new JButton("Cancelar");
+        
+        btnAdicionar.setBackground(COR_BOTAO_ADICIONAR);
+        btnAdicionar.setForeground(Color.WHITE);
+        
+        btnAdicionar.addActionListener(e -> {
+            for (int i = 0; i < model.getRowCount(); i++) {
+                Boolean selecionado = (Boolean) model.getValueAt(i, 5);
+                if (selecionado != null && selecionado) {
+                    int idProduto = (int) model.getValueAt(i, 0);
+                    ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+                    
+                    String quantidadeStr = JOptionPane.showInputDialog(dialog, 
+                        "Quantidade de " + produto.getNome() + ":\nEstoque disponível: " + produto.getQuantidade(),
+                        "Quantidade", JOptionPane.QUESTION_MESSAGE);
+                    
+                    if (quantidadeStr != null && !quantidadeStr.trim().isEmpty()) {
+                        try {
+                            int quantidade = Integer.parseInt(quantidadeStr.trim());
+                            if (quantidade <= 0) {
+                                JOptionPane.showMessageDialog(dialog, "Quantidade deve ser maior que zero!");
+                                continue;
+                            }
+                            
+                            boolean existe = false;
+                            for (ProdutoOrcamento po : produtosSelecionados) {
+                                if (po.getProduto().getId() == idProduto) {
+                                    po.setQuantidade(po.getQuantidade() + quantidade);
+                                    existe = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!existe) {
+                                produtosSelecionados.add(new ProdutoOrcamento(produto, quantidade));
+                            }
+                            
+                        } catch (NumberFormatException ex) {
+                            JOptionPane.showMessageDialog(dialog, "Quantidade inválida!");
+                        }
+                    }
+                }
+            }
+            
+            atualizarListaProdutos();
+            dialog.dispose();
+        });
+        
+        btnCancelar.addActionListener(e -> dialog.dispose());
+        
+        painelBotoes.add(btnAdicionar);
+        painelBotoes.add(btnCancelar);
+        
+        dialog.add(scroll, BorderLayout.CENTER);
+        dialog.add(painelBotoes, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+    
+    private void removerProduto() {
+        int row = tabelaProdutosOrcamento.getSelectedRow();
+        if (row >= 0 && row < produtosSelecionados.size()) {
+            produtosSelecionados.remove(row);
+            atualizarListaProdutos();
+        } else {
+            JOptionPane.showMessageDialog(this, "Selecione um produto para remover!");
+        }
+    }
+    
+    private void atualizarListaProdutos() {
+        modelProdutosOrcamento.setRowCount(0);
+        double total = 0;
+        
+        for (ProdutoOrcamento po : produtosSelecionados) {
+            double subtotal = po.getQuantidade() * po.getProduto().getPrecoVenda();
+            total += subtotal;
+            
+            Object[] row = {
+                po.getProduto().getNome(),
+                po.getQuantidade(),
+                String.format("%.2f", po.getProduto().getPrecoVenda()),
+                String.format("%.2f", subtotal)
+            };
+            modelProdutosOrcamento.addRow(row);
+        }
+        
+        lblTotalOrcamento.setText(String.format("R$ %.2f", total));
+    }
+    
+    private void registrarMovimentacaoReserva(int idOrcamento, String acao) {
+        for (ProdutoOrcamento po : produtosSelecionados) {
+            MovimentacaoEstoque mov = new MovimentacaoEstoque();
+            mov.setIdProduto(po.getProduto().getId());
+            mov.setTipo("RESERVA");
+            mov.setMotivo(acao);
+            mov.setQuantidade(po.getQuantidade());
+            mov.setPrecoUnitario(po.getProduto().getPrecoVenda());
+            mov.setValorTotal(po.getQuantidade() * po.getProduto().getPrecoVenda());
+            mov.setIdUsuario(usuarioLogado.getId());
+            mov.setIdReferencia(idOrcamento);
+            mov.setObservacao("Orçamento #" + idOrcamento + " - " + acao);
+            movimentacaoDAO.inserir(mov);
+        }
+    }
+    
+    private void salvarOrcamento() {
+        if (comboClienteNovo.getSelectedIndex() == -1 || "SELECIONE UM CLIENTE".equals(comboClienteNovo.getSelectedItem())) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return;
+        }
+        
+        String descricao = txtDescricaoOrcamento.getText().trim();
+        if (descricao.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Descrição é obrigatória!");
+            return;
+        }
+        
+        if (produtosSelecionados.isEmpty()) {
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Nenhum produto adicionado. Deseja salvar o orçamento mesmo assim?",
+                "Aviso", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+        
+        double total = 0;
+        for (ProdutoOrcamento po : produtosSelecionados) {
+            total += po.getQuantidade() * po.getProduto().getPrecoVenda();
+        }
+        
+        int idOrcamento = nextId++;
+        
+        Map<String, Object> novoOrcamento = new HashMap<>();
+        novoOrcamento.put("id", idOrcamento);
+        novoOrcamento.put("cliente", comboClienteNovo.getSelectedItem());
+        novoOrcamento.put("descricao", descricao);
+        novoOrcamento.put("valor", total);
+        novoOrcamento.put("status", "PENDENTE");
+        novoOrcamento.put("data", new Date());
+        
+        List<Map<String, Object>> produtosOrc = new ArrayList<>();
+        for (ProdutoOrcamento po : produtosSelecionados) {
+            Map<String, Object> prodMap = new HashMap<>();
+            prodMap.put("idProduto", po.getProduto().getId());
+            prodMap.put("nome", po.getProduto().getNome());
+            prodMap.put("quantidade", po.getQuantidade());
+            prodMap.put("precoUnitario", po.getProduto().getPrecoVenda());
+            prodMap.put("subtotal", po.getQuantidade() * po.getProduto().getPrecoVenda());
+            produtosOrc.add(prodMap);
+        }
+        novoOrcamento.put("produtos", produtosOrc);
+        orcamentos.add(novoOrcamento);
+        
+        registrarMovimentacaoReserva(idOrcamento, "RESERVA_ORCAMENTO");
+        
+        if (osService != null) {
+            int idCliente = Integer.parseInt(((String) comboClienteNovo.getSelectedItem()).split(" - ")[0]);
+            String motivo = "ORÇAMENTO - " + descricao;
+            osService.abrirOSOrcamento(idCliente, motivo, usuarioLogado.getId(), total);
+        }
+        
+        JOptionPane.showMessageDialog(this, 
+            "✅ Orçamento #" + idOrcamento + " salvo com sucesso!\n\n" +
+            "Cliente: " + comboClienteNovo.getSelectedItem() + "\n" +
+            "Descrição: " + descricao + "\n" +
+            "Valor Total: R$ " + String.format("%.2f", total) + "\n" +
+            "Produtos: " + produtosSelecionados.size() + "\n\n" +
+            "Os produtos foram reservados no estoque até a aprovação do orçamento.",
+            "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+        
+        // Limpar formulário
+        txtDescricaoOrcamento.setText("");
+        produtosSelecionados.clear();
+        atualizarListaProdutos();
+        comboClienteNovo.setSelectedIndex(0);
+        carregarOrcamentos();
+    }
+    
+    private void aprovarOrcamento() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um orçamento para aprovar!");
+            return;
+        }
+        
+        int id = (int) modelOrcamentos.getValueAt(row, 0);
+        String status = (String) modelOrcamentos.getValueAt(row, 4);
+        
+        if (!"PENDENTE".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Apenas orçamentos pendentes podem ser aprovados!");
+            return;
+        }
+        
+        Map<String, Object> orcamentoEncontrado = null;
+        for (Map<String, Object> o : orcamentos) {
+            if ((int) o.get("id") == id) {
+                orcamentoEncontrado = o;
+                break;
+            }
+        }
+        
+        if (orcamentoEncontrado == null) {
+            JOptionPane.showMessageDialog(this, "Orçamento não encontrado!");
+            return;
+        }
+        
+        List<Map<String, Object>> produtosOrc = (List<Map<String, Object>>) orcamentoEncontrado.get("produtos");
+        boolean estoqueOK = true;
+        StringBuilder erros = new StringBuilder();
+        
+        for (Map<String, Object> prodMap : produtosOrc) {
+            int idProduto = (int) prodMap.get("idProduto");
+            int quantidade = (int) prodMap.get("quantidade");
+            ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+            
+            if (produto == null) {
+                erros.append("Produto ID ").append(idProduto).append(" não encontrado!\n");
+                estoqueOK = false;
+            } else if (produto.getQuantidade() < quantidade) {
+                erros.append("Estoque insuficiente para: ").append(produto.getNome())
+                     .append(" (Disponível: ").append(produto.getQuantidade())
+                     .append(", Necessário: ").append(quantidade).append(")\n");
+                estoqueOK = false;
+            }
+        }
+        
+        if (!estoqueOK) {
+            JOptionPane.showMessageDialog(this, 
+                "Não foi possível aprovar o orçamento devido a problemas de estoque:\n\n" + erros.toString(),
+                "Estoque Insuficiente", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Aprovar orçamento #" + id + "?\n\n" +
+            "Esta ação irá:\n" +
+            "1. Dar baixa nos produtos do estoque\n" +
+            "2. Registrar a venda\n" +
+            "3. O orçamento não poderá mais ser alterado\n\n" +
+            "Deseja continuar?",
+            "Aprovar Orçamento", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            for (Map<String, Object> prodMap : produtosOrc) {
+                int idProduto = (int) prodMap.get("idProduto");
+                int quantidade = (int) prodMap.get("quantidade");
+                double precoUnitario = (double) prodMap.get("precoUnitario");
+                ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+                
+                if (produto != null) {
+                    produto.setQuantidade(produto.getQuantidade() - quantidade);
+                    produtoDAO.atualizar(produto);
+                    
+                    MovimentacaoEstoque mov = new MovimentacaoEstoque();
+                    mov.setIdProduto(idProduto);
+                    mov.setTipo("SAIDA");
+                    mov.setMotivo("VENDA");
+                    mov.setQuantidade(quantidade);
+                    mov.setPrecoUnitario(precoUnitario);
+                    mov.setValorTotal(quantidade * precoUnitario);
+                    mov.setIdUsuario(usuarioLogado.getId());
+                    mov.setIdReferencia(id);
+                    mov.setObservacao("Orçamento #" + id + " aprovado");
+                    movimentacaoDAO.inserir(mov);
+                }
+            }
+            
+            for (Map<String, Object> o : orcamentos) {
+                if ((int) o.get("id") == id) {
+                    o.put("status", "APROVADO");
+                    break;
+                }
+            }
+            
+            JOptionPane.showMessageDialog(this, "Orçamento #" + id + " aprovado com sucesso!\n\n" +
+                "Estoque atualizado e venda registrada.");
+            carregarOrcamentos();
+            
+            int converter = JOptionPane.showConfirmDialog(this,
+                "Deseja converter este orçamento aprovado em uma Ordem de Instalação?",
+                "Converter para Instalação", JOptionPane.YES_NO_OPTION);
+            
+            if (converter == JOptionPane.YES_OPTION) {
+                converterParaInstalacao();
+            }
+        }
+    }
+    
+    private void rejeitarOrcamento() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um orçamento para rejeitar!");
+            return;
+        }
+        
+        int id = (int) modelOrcamentos.getValueAt(row, 0);
+        String status = (String) modelOrcamentos.getValueAt(row, 4);
+        
+        if (!"PENDENTE".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Apenas orçamentos pendentes podem ser rejeitados!");
+            return;
+        }
+        
+        String motivo = JOptionPane.showInputDialog(this, "Motivo da rejeição:", "Rejeitar Orçamento", JOptionPane.QUESTION_MESSAGE);
+        if (motivo == null) return;
+        
+        for (Map<String, Object> o : orcamentos) {
+            if ((int) o.get("id") == id) {
+                List<Map<String, Object>> produtosOrc = (List<Map<String, Object>>) o.get("produtos");
+                for (Map<String, Object> prodMap : produtosOrc) {
+                    int idProduto = (int) prodMap.get("idProduto");
+                    int quantidade = (int) prodMap.get("quantidade");
+                    double precoUnitario = (double) prodMap.get("precoUnitario");
+                    
+                    MovimentacaoEstoque mov = new MovimentacaoEstoque();
+                    mov.setIdProduto(idProduto);
+                    mov.setTipo("CANCELAMENTO_RESERVA");
+                    mov.setMotivo("REJEICAO");
+                    mov.setQuantidade(quantidade);
+                    mov.setPrecoUnitario(precoUnitario);
+                    mov.setValorTotal(quantidade * precoUnitario);
+                    mov.setIdUsuario(usuarioLogado.getId());
+                    mov.setIdReferencia(id);
+                    mov.setObservacao("Orçamento #" + id + " rejeitado - Motivo: " + motivo);
+                    movimentacaoDAO.inserir(mov);
+                }
+                
+                o.put("status", "REJEITADO");
+                o.put("motivoRejeicao", motivo);
+                break;
+            }
+        }
+        
+        JOptionPane.showMessageDialog(this, "Orçamento #" + id + " rejeitado!\nMotivo: " + motivo +
+            "\n\nA reserva de produtos foi cancelada.");
+        carregarOrcamentos();
+    }
+    
+    private void converterParaInstalacao() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um orçamento para converter em instalação!");
+            return;
+        }
+        
+        int id = (int) modelOrcamentos.getValueAt(row, 0);
+        String status = (String) modelOrcamentos.getValueAt(row, 4);
+        
+        if (!"APROVADO".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Apenas orçamentos aprovados podem ser convertidos em instalação!");
+            return;
+        }
+        
+        Map<String, Object> orcamento = null;
+        for (Map<String, Object> o : orcamentos) {
+            if ((int) o.get("id") == id) {
+                orcamento = o;
+                break;
+            }
+        }
+        
+        if (orcamento == null) {
+            JOptionPane.showMessageDialog(this, "Orçamento não encontrado!");
+            return;
+        }
+        
+        String clienteStr = (String) orcamento.get("cliente");
+        double valorTotal = (double) orcamento.get("valor");
+        String descricao = (String) orcamento.get("descricao");
+        
+        // Extrair ID do cliente
+        int idCliente;
+        try {
+            idCliente = Integer.parseInt(clienteStr.split(" - ")[0]);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erro ao identificar cliente!");
+            return;
+        }
+        
+        // Verificar se cliente já possui OS aberta
+        if (osService != null && osService.clientePossuiOSAberta(idCliente)) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Não foi possível criar a Ordem de Instalação!\n\n" +
+                "O cliente já possui uma OS em aberto.\n" +
+                "Feche a OS existente antes de converter este orçamento.", 
+                "OS Existente", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // Solicitar endereço de instalação
+        String enderecoInstalacao = JOptionPane.showInputDialog(this, 
+            "Informe o endereço de instalação:", 
+            "Endereço de Instalação", 
+            JOptionPane.QUESTION_MESSAGE);
+        
+        if (enderecoInstalacao == null || enderecoInstalacao.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Endereço de instalação é obrigatório!");
+            return;
+        }
+        
+        // Solicitar data de agendamento
+        JSpinner spDataAgendamento = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spDataAgendamento, "dd/MM/yyyy");
+        spDataAgendamento.setEditor(editor);
+        spDataAgendamento.setValue(new Date());
+        
+        int resultData = JOptionPane.showConfirmDialog(this, spDataAgendamento, 
+            "Selecione a data de agendamento:", 
+            JOptionPane.OK_CANCEL_OPTION);
+        
+        if (resultData != JOptionPane.OK_OPTION) return;
+        
+        Date dataAgendamento = (Date) spDataAgendamento.getValue();
+        
+        // Criar a Ordem de Instalação
+        OrdemServico os = null;
+        
+        if (osService != null) {
+            String motivo = "INSTALAÇÃO - Orçamento #" + id + " aprovado - " + descricao;
+            
+            os = osService.abrirOSInstalacaoCompleta(
+                idCliente, 
+                motivo, 
+                usuarioLogado.getId(), 
+                valorTotal, 
+                enderecoInstalacao, 
+                dataAgendamento,
+                descricao,
+                "Orçamento #" + id + " convertido em instalação"
+            );
+        }
+        
+        // Fallback: criar OS diretamente no DAO
+        if (os == null) {
+            os = new OrdemServico();
+            os.setIdCliente(idCliente);
+            os.setIdEquipamento(0);
+            os.setTipoNivel("1º Nível");
+            os.setStatus("ABERTA");
+            os.setMotivo("INSTALAÇÃO - Orçamento #" + id + " aprovado - " + descricao);
+            os.setDataAbertura(new Date());
+            os.setIdUsuarioAbertura(usuarioLogado.getId());
+            os.setTipoOs("INSTALACAO");
+            os.setTipoOrdem("INSTALACAO");
+            os.setDepartamentoOrigem("VENDAS");
+            os.setValorTotal(valorTotal);
+            os.setEnderecoInstalacao(enderecoInstalacao);
+            os.setDataAgendamento(dataAgendamento);
+            os.setDescricaoSolucao(descricao);
+            os.setObservacoes("Orçamento #" + id + " convertido em instalação");
+            
+            if (ordemServicoDAO.inserir(os)) {
+                // Sucesso
+            } else {
+                os = null;
+            }
+        }
+        
+        if (os != null && os.getId() > 0) {
+            // Adicionar os produtos do orçamento à instalação
+            List<Map<String, Object>> produtosOrc = (List<Map<String, Object>>) orcamento.get("produtos");
+            
+            for (Map<String, Object> prodMap : produtosOrc) {
+                int idProduto = (int) prodMap.get("idProduto");
+                int quantidade = (int) prodMap.get("quantidade");
+                double precoUnitario = (double) prodMap.get("precoUnitario");
+                
+                ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+                if (produto != null) {
+                    InstalacaoProduto item = new InstalacaoProduto();
+                    item.setIdOrdemInstalacao(os.getId());
+                    item.setIdProduto(idProduto);
+                    item.setNomeProduto(produto.getNome());
+                    item.setQuantidade(quantidade);
+                    item.setPrecoUnitario(precoUnitario);
+                    item.setSubtotal(quantidade * precoUnitario);
+                    instalacaoProdutoDAO.inserir(item);
+                }
+            }
+            
+            JOptionPane.showMessageDialog(this, 
+                "✅ Orçamento #" + id + " convertido para Ordem de Instalação #" + os.getId() + "!\n\n" +
+                "Cliente: " + clienteStr + "\n" +
+                "Valor: R$ " + String.format("%.2f", valorTotal) + "\n" +
+                "Endereço: " + enderecoInstalacao + "\n" +
+                "Data Agendamento: " + new SimpleDateFormat("dd/MM/yyyy").format(dataAgendamento) + "\n\n" +
+                "Acesse a tela 'Ordem de Instalação (ST)' no menu Vendas para gerenciar.",
+                "Conversão Realizada", JOptionPane.INFORMATION_MESSAGE);
+            
+            carregarOrcamentos();
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Erro ao criar Ordem de Instalação!\n" +
+                "Verifique se o cliente não possui outra OS em aberto.", 
+                "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private class ProdutoOrcamento {
+        private ProdutoEstoque produto;
+        private int quantidade;
+        
+        public ProdutoOrcamento(ProdutoEstoque produto, int quantidade) {
+            this.produto = produto;
+            this.quantidade = quantidade;
+        }
+        
+        public ProdutoEstoque getProduto() { return produto; }
+        public int getQuantidade() { return quantidade; }
+        public void setQuantidade(int quantidade) { this.quantidade = quantidade; }
+    }
+}

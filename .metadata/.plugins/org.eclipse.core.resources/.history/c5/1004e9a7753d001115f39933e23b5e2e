@@ -1,0 +1,49 @@
+// InstalacaoProdutoDAO.java
+package com.monitoramento.dao;
+
+import com.monitoramento.model.InstalacaoProduto;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class InstalacaoProdutoDAO {
+    private static final String FILE_NAME = "instalacao_produtos.json";
+    private List<InstalacaoProduto> instalacoesProdutos;
+    
+    public InstalacaoProdutoDAO() {
+        carregarInstalacoesProdutos();
+    }
+    
+    private void carregarInstalacoesProdutos() {
+        instalacoesProdutos = DatabaseConnection.carregarLista(FILE_NAME, InstalacaoProduto.class);
+        if (instalacoesProdutos == null) {
+            instalacoesProdutos = new ArrayList<>();
+        }
+    }
+    
+    private void salvarInstalacoesProdutos() {
+        DatabaseConnection.salvarLista(FILE_NAME, instalacoesProdutos);
+    }
+    
+    public boolean inserir(InstalacaoProduto item) {
+        item.setId(DatabaseConnection.gerarNovoId(instalacoesProdutos));
+        instalacoesProdutos.add(item);
+        salvarInstalacoesProdutos();
+        return true;
+    }
+    
+    public List<InstalacaoProduto> listarPorOrdemInstalacao(int idOrdemInstalacao) {
+        return instalacoesProdutos.stream()
+            .filter(i -> i.getIdOrdemInstalacao() == idOrdemInstalacao)
+            .collect(Collectors.toList());
+    }
+    
+    public boolean excluirPorOrdemInstalacao(int idOrdemInstalacao) {
+        boolean removido = instalacoesProdutos.removeIf(i -> i.getIdOrdemInstalacao() == idOrdemInstalacao);
+        if (removido) {
+            salvarInstalacoesProdutos();
+        }
+        return removido;
+    }
+}

@@ -1,0 +1,410 @@
+// TelaAtendimento.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Atendimento;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.dao.AtendimentoDAO;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.OrdemServicoDAO;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
+public class TelaAtendimento extends JFrame {
+    private JTable tabelaAtendimentos;
+    private DefaultTableModel tableModel;
+    private AtendimentoDAO atendimentoDAO;
+    private ClienteDAO clienteDAO;
+    private OrdemServicoDAO ordemServicoDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private Usuario usuarioLogado;
+    
+    private JComboBox<String> comboTipo, comboFiltroStatus, comboCliente;
+    private JTextField txtAssunto;
+    private JTextArea txtDescricao;
+    private JComboBox<String> comboPrioridade;
+    private JButton btnRegistrar, btnConcluir, btnConverterOS, btnAtualizar;
+    
+    public TelaAtendimento(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.atendimentoDAO = new AtendimentoDAO();
+        this.clienteDAO = new ClienteDAO();
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        
+        initComponents();
+        carregarAtendimentos();
+        carregarClientesCombo();
+        setLocationRelativeTo(null);
+    }
+    
+    private void initComponents() {
+        setTitle("Atendimento ao Cliente - Usuário: " + usuarioLogado.getLogin());
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setSize(1100, 700);
+        setLayout(new BorderLayout());
+        
+        // Painel de filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        painelFiltros.add(new JLabel("Status:"));
+        comboFiltroStatus = new JComboBox<>(new String[]{"TODOS", "PENDENTE", "CONCLUIDO", "CANCELADO"});
+        
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboCliente = new JComboBox<>();
+        comboCliente.setPreferredSize(new Dimension(200, 25));
+        
+        JButton btnFiltrar = new JButton("Filtrar");
+        JButton btnLimpar = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarAtendimentos());
+        btnLimpar.addActionListener(e -> {
+            comboFiltroStatus.setSelectedIndex(0);
+            comboCliente.setSelectedIndex(0);
+            carregarAtendimentos();
+        });
+        
+        painelFiltros.add(comboFiltroStatus);
+        painelFiltros.add(comboCliente);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        // Tabela
+        String[] colunas = {"ID", "Cliente", "Tipo", "Assunto", "Prioridade", "Status", "Data Abertura", "Data Conclusão"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaAtendimentos = new JTable(tableModel);
+        tabelaAtendimentos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabelaAtendimentos.setRowHeight(25);
+        
+        tabelaAtendimentos.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaAtendimentos.getColumnModel().getColumn(1).setPreferredWidth(200);
+        tabelaAtendimentos.getColumnModel().getColumn(2).setPreferredWidth(120);
+        tabelaAtendimentos.getColumnModel().getColumn(3).setPreferredWidth(200);
+        tabelaAtendimentos.getColumnModel().getColumn(4).setPreferredWidth(80);
+        tabelaAtendimentos.getColumnModel().getColumn(5).setPreferredWidth(100);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaAtendimentos);
+        
+        // Painel de registro de atendimento
+        JPanel painelRegistro = criarPainelRegistro();
+        
+        // Painel de botões
+        JPanel painelBotoes = new JPanel(new FlowLayout());
+        btnRegistrar = new JButton("Registrar Atendimento");
+        btnConcluir = new JButton("Concluir Atendimento");
+        btnConverterOS = new JButton("Converter para OS");
+        btnAtualizar = new JButton("Atualizar");
+        JButton btnVoltar = new JButton("Voltar");
+        
+        btnRegistrar.addActionListener(e -> registrarAtendimento());
+        btnConcluir.addActionListener(e -> concluirAtendimento());
+        btnConverterOS.addActionListener(e -> converterParaOS());
+        btnAtualizar.addActionListener(e -> carregarAtendimentos());
+        btnVoltar.addActionListener(e -> dispose());
+        
+        tabelaAtendimentos.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                atualizarBotoes();
+            }
+        });
+        
+        painelBotoes.add(btnRegistrar);
+        painelBotoes.add(btnConcluir);
+        painelBotoes.add(btnConverterOS);
+        painelBotoes.add(btnAtualizar);
+        painelBotoes.add(btnVoltar);
+        
+        // Layout
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.5);
+        splitPane.setTopComponent(scrollTabela);
+        splitPane.setBottomComponent(painelRegistro);
+        
+        add(painelFiltros, BorderLayout.NORTH);
+        add(splitPane, BorderLayout.CENTER);
+        add(painelBotoes, BorderLayout.SOUTH);
+    }
+    
+    private JPanel criarPainelRegistro() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Novo Atendimento"));
+        
+        JPanel panelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelCampos.add(new JLabel("Cliente:*"), gbc);
+        JComboBox<String> comboNovoCliente = new JComboBox<>();
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        panelCampos.add(comboNovoCliente, gbc);
+        
+        // Carregar clientes no combo
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            comboNovoCliente.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        panelCampos.add(new JLabel("Tipo:*"), gbc);
+        comboTipo = new JComboBox<>(new String[]{"SOLICITACAO", "ORCAMENTO", "ORDEM_INSTALACAO", "ORDEM_REPARO"});
+        gbc.gridx = 1;
+        panelCampos.add(comboTipo, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelCampos.add(new JLabel("Assunto:*"), gbc);
+        txtAssunto = new JTextField(30);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        panelCampos.add(txtAssunto, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridwidth = 1;
+        panelCampos.add(new JLabel("Descrição:*"), gbc);
+        txtDescricao = new JTextArea(4, 30);
+        txtDescricao.setLineWrap(true);
+        JScrollPane scrollDesc = new JScrollPane(txtDescricao);
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        panelCampos.add(scrollDesc, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.gridwidth = 1;
+        panelCampos.add(new JLabel("Prioridade:*"), gbc);
+        comboPrioridade = new JComboBox<>(new String[]{"BAIXA", "MEDIA", "ALTA"});
+        gbc.gridx = 1;
+        panelCampos.add(comboPrioridade, gbc);
+        
+        JButton btnSalvar = new JButton("Salvar Atendimento");
+        btnSalvar.addActionListener(e -> {
+            if (comboNovoCliente.getSelectedIndex() == -1) {
+                JOptionPane.showMessageDialog(panel, "Selecione um cliente!");
+                return;
+            }
+            
+            String selected = (String) comboNovoCliente.getSelectedItem();
+            int idCliente = Integer.parseInt(selected.split(" - ")[0]);
+            String tipo = (String) comboTipo.getSelectedItem();
+            String assunto = txtAssunto.getText().trim();
+            String descricao = txtDescricao.getText().trim();
+            String prioridade = (String) comboPrioridade.getSelectedItem();
+            
+            if (assunto.isEmpty() || descricao.isEmpty()) {
+                JOptionPane.showMessageDialog(panel, "Assunto e descrição são obrigatórios!");
+                return;
+            }
+            
+            Atendimento a = new Atendimento();
+            a.setIdCliente(idCliente);
+            a.setTipo(tipo);
+            a.setAssunto(assunto);
+            a.setDescricao(descricao);
+            a.setPrioridade(prioridade);
+            a.setIdUsuarioAbertura(usuarioLogado.getId());
+            
+            if (atendimentoDAO.inserir(a)) {
+                JOptionPane.showMessageDialog(panel, "Atendimento registrado com sucesso!");
+                txtAssunto.setText("");
+                txtDescricao.setText("");
+                comboTipo.setSelectedIndex(0);
+                comboPrioridade.setSelectedIndex(0);
+                carregarAtendimentos();
+            } else {
+                JOptionPane.showMessageDialog(panel, "Erro ao registrar atendimento!");
+            }
+        });
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        gbc.gridwidth = 3;
+        panelCampos.add(btnSalvar, gbc);
+        
+        panel.add(panelCampos, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    private void carregarClientesCombo() {
+        comboCliente.removeAllItems();
+        comboCliente.addItem("TODOS");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            comboCliente.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private void carregarAtendimentos() {
+        tableModel.setRowCount(0);
+        List<Atendimento> atendimentos = atendimentoDAO.listarTodos();
+        adicionarAtendimentosTabela(atendimentos);
+    }
+    
+    private void filtrarAtendimentos() {
+        String status = (String) comboFiltroStatus.getSelectedItem();
+        String clienteSelecionado = (String) comboCliente.getSelectedItem();
+        
+        List<Atendimento> atendimentos = atendimentoDAO.listarTodos();
+        
+        if (!"TODOS".equals(status)) {
+            atendimentos = atendimentos.stream()
+                .filter(a -> a.getStatus().equals(status))
+                .toList();
+        }
+        
+        if (clienteSelecionado != null && !"TODOS".equals(clienteSelecionado)) {
+            int idCliente = Integer.parseInt(clienteSelecionado.split(" - ")[0]);
+            atendimentos = atendimentos.stream()
+                .filter(a -> a.getIdCliente() == idCliente)
+                .toList();
+        }
+        
+        adicionarAtendimentosTabela(atendimentos);
+    }
+    
+    private void adicionarAtendimentosTabela(List<Atendimento> atendimentos) {
+        tableModel.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        
+        for (Atendimento a : atendimentos) {
+            Cliente c = clienteDAO.buscarPorId(a.getIdCliente());
+            String nomeCliente = c != null ? c.getNomeExibicao() : "N/A";
+            
+            Object[] row = {
+                a.getId(),
+                nomeCliente,
+                a.getTipo(),
+                a.getAssunto() != null ? (a.getAssunto().length() > 40 ? a.getAssunto().substring(0, 40) + "..." : a.getAssunto()) : "",
+                a.getPrioridade(),
+                a.getStatus(),
+                a.getDataAbertura() != null ? sdf.format(a.getDataAbertura()) : "",
+                a.getDataConclusao() != null ? sdf.format(a.getDataConclusao()) : ""
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void atualizarBotoes() {
+        int row = tabelaAtendimentos.getSelectedRow();
+        boolean selecionado = row >= 0;
+        
+        if (selecionado) {
+            String status = (String) tableModel.getValueAt(row, 5);
+            String tipo = (String) tableModel.getValueAt(row, 2);
+            
+            btnConcluir.setEnabled("PENDENTE".equals(status));
+            btnConverterOS.setEnabled("PENDENTE".equals(status) && "SOLICITACAO".equals(tipo));
+        } else {
+            btnConcluir.setEnabled(false);
+            btnConverterOS.setEnabled(false);
+        }
+    }
+    
+    private void registrarAtendimento() {
+        JOptionPane.showMessageDialog(this, "Use o formulário abaixo para registrar um novo atendimento!");
+    }
+    
+    private void concluirAtendimento() {
+        int row = tabelaAtendimentos.getSelectedRow();
+        if (row < 0) return;
+        
+        int id = (int) tableModel.getValueAt(row, 0);
+        
+        String descricaoConclusao = JOptionPane.showInputDialog(this, 
+            "Informe a descrição da conclusão do atendimento:", 
+            "Concluir Atendimento", JOptionPane.QUESTION_MESSAGE);
+        
+        if (descricaoConclusao != null && !descricaoConclusao.trim().isEmpty()) {
+            if (atendimentoDAO.concluirAtendimento(id, descricaoConclusao, usuarioLogado.getId())) {
+                JOptionPane.showMessageDialog(this, "Atendimento concluído com sucesso!");
+                carregarAtendimentos();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao concluir atendimento!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void converterParaOS() {
+        int row = tabelaAtendimentos.getSelectedRow();
+        if (row < 0) return;
+        
+        int idAtendimento = (int) tableModel.getValueAt(row, 0);
+        Atendimento a = atendimentoDAO.buscarPorId(idAtendimento);
+        
+        if (a == null) return;
+        
+        Cliente cliente = clienteDAO.buscarPorId(a.getIdCliente());
+        if (cliente == null) {
+            JOptionPane.showMessageDialog(this, "Cliente não encontrado!");
+            return;
+        }
+        
+        List<OrdemServico> ordensAbertas = ordemServicoDAO.buscarOrdensAbertasPorCliente(a.getIdCliente());
+        if (!ordensAbertas.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Cliente já possui uma OS aberta!\nOS #" + ordensAbertas.get(0).getId() + 
+                "\nFeche a OS existente antes de abrir uma nova.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        var equipamentos = equipamentoDAO.buscarPorCliente(a.getIdCliente());
+        if (equipamentos.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Cliente não possui equipamento cadastrado!\nCadastre um equipamento primeiro.", 
+                "Erro", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Deseja converter este atendimento em Ordem de Serviço?\n\n" +
+            "Cliente: " + cliente.getNomeExibicao() + "\n" +
+            "Assunto: " + a.getAssunto() + "\n" +
+            "Descrição: " + a.getDescricao() + "\n\n" +
+            "A OS será encaminhada para o 1º Nível.", 
+            "Converter para OS", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            OrdemServico os = new OrdemServico();
+            os.setIdCliente(a.getIdCliente());
+            os.setIdEquipamento(equipamentos.get(0).getId());
+            os.setTipoNivel("1º Nível");
+            os.setStatus("ABERTA");
+            os.setMotivo("[ATENDIMENTO] " + a.getAssunto() + " - " + a.getDescricao());
+            os.setDataAbertura(new Date());
+            os.setIdUsuarioAbertura(usuarioLogado.getId());
+            
+            if (ordemServicoDAO.inserir(os)) {
+                a.setIdOrdemServicoVinculada(os.getId());
+                a.setStatus("CONCLUIDO");
+                a.setDataConclusao(new Date());
+                a.setIdUsuarioAtendimento(usuarioLogado.getId());
+                atendimentoDAO.atualizar(a);
+                
+                JOptionPane.showMessageDialog(this, 
+                    "OS #" + os.getId() + " aberta com sucesso!\n" +
+                    "O atendimento foi encaminhado para o 1º Nível.");
+                
+                carregarAtendimentos();
+                
+                Main.getOrdemServicoService().listarOSAbertas();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao criar Ordem de Serviço!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+}

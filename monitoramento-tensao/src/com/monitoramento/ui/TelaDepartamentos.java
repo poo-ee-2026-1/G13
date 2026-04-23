@@ -1,0 +1,264 @@
+// TelaDepartamentos.java (Convertido para JPanel)
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Departamento;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.DepartamentoDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.List;
+
+public class TelaDepartamentos extends JPanel {
+    private JTable tabelaDepartamentos;
+    private DefaultTableModel tableModel;
+    private DepartamentoDAO departamentoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTextField txtId, txtNome, txtDescricao, txtResponsavel, txtTelefone, txtEmail;
+    private JButton btnInserir, btnAtualizar, btnExcluir, btnLimpar;
+    
+    public TelaDepartamentos(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.departamentoDAO = new DepartamentoDAO();
+        
+        initComponents();
+        carregarDepartamentos();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setResizeWeight(0.5);
+        
+        String[] colunas = {"ID", "Nome", "Descrição", "Responsável", "Telefone", "Email"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaDepartamentos = new JTable(tableModel);
+        tabelaDepartamentos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tabelaDepartamentos.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                carregarDepartamentoSelecionado();
+            }
+        });
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaDepartamentos);
+        
+        JPanel panelForm = criarPainelFormulario();
+        
+        splitPane.setTopComponent(scrollTabela);
+        splitPane.setBottomComponent(panelForm);
+        
+        add(splitPane, BorderLayout.CENTER);
+        
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnNovo = new JButton("Novo");
+        btnNovo.addActionListener(e -> limparFormulario());
+        
+        JButton btnRefresh = new JButton("Atualizar");
+        btnRefresh.addActionListener(e -> carregarDepartamentos());
+        
+        toolBar.add(btnNovo);
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        add(toolBar, BorderLayout.NORTH);
+    }
+    
+    private JPanel criarPainelFormulario() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Dados do Departamento"));
+        
+        JPanel panelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelCampos.add(new JLabel("ID:"), gbc);
+        txtId = new JTextField(10);
+        txtId.setEditable(false);
+        gbc.gridx = 1;
+        panelCampos.add(txtId, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panelCampos.add(new JLabel("Nome:*"), gbc);
+        txtNome = new JTextField(20);
+        gbc.gridx = 1;
+        panelCampos.add(txtNome, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelCampos.add(new JLabel("Descrição:"), gbc);
+        txtDescricao = new JTextField(30);
+        gbc.gridx = 1;
+        panelCampos.add(txtDescricao, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panelCampos.add(new JLabel("Responsável:"), gbc);
+        txtResponsavel = new JTextField(20);
+        gbc.gridx = 1;
+        panelCampos.add(txtResponsavel, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        panelCampos.add(new JLabel("Telefone:"), gbc);
+        txtTelefone = new JTextField(15);
+        gbc.gridx = 1;
+        panelCampos.add(txtTelefone, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        panelCampos.add(new JLabel("Email:"), gbc);
+        txtEmail = new JTextField(25);
+        gbc.gridx = 1;
+        panelCampos.add(txtEmail, gbc);
+        
+        JPanel panelBotoes = new JPanel(new FlowLayout());
+        btnInserir = new JButton("Inserir");
+        btnAtualizar = new JButton("Atualizar");
+        btnExcluir = new JButton("Excluir");
+        btnLimpar = new JButton("Limpar");
+        
+        btnInserir.addActionListener(e -> inserirDepartamento());
+        btnAtualizar.addActionListener(e -> atualizarDepartamento());
+        btnExcluir.addActionListener(e -> excluirDepartamento());
+        btnLimpar.addActionListener(e -> limparFormulario());
+        
+        panelBotoes.add(btnInserir);
+        panelBotoes.add(btnAtualizar);
+        panelBotoes.add(btnExcluir);
+        panelBotoes.add(btnLimpar);
+        
+        panel.add(panelCampos, BorderLayout.CENTER);
+        panel.add(panelBotoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void carregarDepartamentos() {
+        tableModel.setRowCount(0);
+        List<Departamento> departamentos = departamentoDAO.listarTodos();
+        
+        for (Departamento d : departamentos) {
+            Object[] row = {
+                d.getId(),
+                d.getNome(),
+                d.getDescricao() != null ? d.getDescricao() : "",
+                d.getResponsavel() != null ? d.getResponsavel() : "",
+                d.getTelefone() != null ? d.getTelefone() : "",
+                d.getEmail() != null ? d.getEmail() : ""
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void carregarDepartamentoSelecionado() {
+        int row = tabelaDepartamentos.getSelectedRow();
+        if (row >= 0) {
+            int id = (int) tableModel.getValueAt(row, 0);
+            Departamento d = departamentoDAO.buscarPorId(id);
+            if (d != null) {
+                txtId.setText(String.valueOf(d.getId()));
+                txtNome.setText(d.getNome());
+                txtDescricao.setText(d.getDescricao() != null ? d.getDescricao() : "");
+                txtResponsavel.setText(d.getResponsavel() != null ? d.getResponsavel() : "");
+                txtTelefone.setText(d.getTelefone() != null ? d.getTelefone() : "");
+                txtEmail.setText(d.getEmail() != null ? d.getEmail() : "");
+            }
+        }
+    }
+    
+    private void inserirDepartamento() {
+        if (!validarCampos()) return;
+        
+        Departamento departamento = new Departamento();
+        preencherDepartamento(departamento);
+        
+        if (departamentoDAO.inserir(departamento)) {
+            JOptionPane.showMessageDialog(this, "Departamento inserido com sucesso!");
+            carregarDepartamentos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao inserir departamento!\nVerifique se o nome já está cadastrado.", 
+                                        "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void atualizarDepartamento() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um departamento para atualizar!");
+            return;
+        }
+        
+        if (!validarCampos()) return;
+        
+        Departamento departamento = new Departamento();
+        departamento.setId(Integer.parseInt(txtId.getText()));
+        preencherDepartamento(departamento);
+        
+        if (departamentoDAO.atualizar(departamento)) {
+            JOptionPane.showMessageDialog(this, "Departamento atualizado com sucesso!");
+            carregarDepartamentos();
+            limparFormulario();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar departamento!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void excluirDepartamento() {
+        if (txtId.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selecione um departamento para excluir!");
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Deseja realmente excluir este departamento?", 
+            "Confirmar exclusão", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            int id = Integer.parseInt(txtId.getText());
+            if (departamentoDAO.excluir(id)) {
+                JOptionPane.showMessageDialog(this, "Departamento excluído com sucesso!");
+                carregarDepartamentos();
+                limparFormulario();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao excluir departamento!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void preencherDepartamento(Departamento departamento) {
+        departamento.setNome(txtNome.getText().trim().toUpperCase());
+        departamento.setDescricao(txtDescricao.getText().trim());
+        departamento.setResponsavel(txtResponsavel.getText().trim());
+        departamento.setTelefone(txtTelefone.getText().trim());
+        departamento.setEmail(txtEmail.getText().trim());
+    }
+    
+    private boolean validarCampos() {
+        if (txtNome.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nome é obrigatório!");
+            return false;
+        }
+        return true;
+    }
+    
+    private void limparFormulario() {
+        txtId.setText("");
+        txtNome.setText("");
+        txtDescricao.setText("");
+        txtResponsavel.setText("");
+        txtTelefone.setText("");
+        txtEmail.setText("");
+        txtNome.requestFocus();
+    }
+}

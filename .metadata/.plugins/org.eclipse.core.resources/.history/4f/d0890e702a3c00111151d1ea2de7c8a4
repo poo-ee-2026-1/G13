@@ -1,0 +1,168 @@
+package com.monitoramento.service;
+
+import com.monitoramento.model.Cliente;
+import com.monitoramento.dao.ClienteDAO;
+
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
+
+import java.net.InetSocketAddress;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+public class WebSocketServer extends WebSocketServer {
+    private MonitoramentoService monitoramentoService;
+    private ClienteDAO clienteDAO;
+    private Map<WebSocket, Integer> conexoesClientes;
+    private Map<String, Integer> ipClienteMap;
+    
+    private static final int PORTA_PADRAO = 8080;
+    
+    public WebSocketServer(MonitoramentoService monitoramentoService) {
+        super(new InetSocketAddress(PORTA_PADRAO));
+        this.monitoramentoService = monitoramentoService;
+        this.clienteDAO = new ClienteDAO();
+        this.conexoesClientes = new ConcurrentHashMap<>();
+        this.ipClienteMap = new ConcurrentHashMap<>();
+        
+        // Mapear IPs dos clientes cadastrados
+        mapearIPsClientes();
+    }
+    
+    private void mapearIPsClientes() {
+        List<Cliente> clientes = clienteDAO.listarPorMonitoramento(true);
+        for (Cliente cliente : clientes) {
+            if (cliente.getIpCliente() != null && !cliente.getIpCliente().isEmpty()) {
+                ipClienteMap.put(cliente.getIpCliente(), cliente.getId());
+            }
+        }
+        System.out.println("Mapeados " + ipClienteMap.size() + " clientes por IP");
+    }
+    
+    @Override
+    public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        String ipCliente = conn.getRemoteSocketAddress().getAddress().getHostAddress();
+        System.out.println("Nova conexão WebSocket de: " + ipCliente);
+        
+        // Verificar se o IP corresponde a algum cliente cadastrado
+        Integer idCliente = ipClienteMap.get(ipCliente);
+        if (idCliente != null) {
+            conexoesClientes.put(conn, idCliente);
+            System.out.println("Cliente ID " + idCliente + " conectado via WebSocket");
+            
+            // Iniciar monitoramento do cliente
+            monitoramentoService.iniciarMonitoramentoCliente(idCliente);
+            
+            // Enviar confirmação
+            JsonObject response = new JsonObject();
+            response.addProperty("status", "conectado");
+            response.addProperty("cliente_id", idCliente);
+            response.addProperty("message", "Monitoramento iniciado");
+            conn.send(response.toString());
+        } else {
+            System.out.println("IP não cadastrado: " + ipCliente);
+            JsonObject response = new JsonObject();
+            response.addProperty("status", "erro");
+            response.addProperty("message", "IP não cadastrado no sistema");
+            conn.send(response.toString());
+        }
+    }
+    
+    @Override
+    public void onClose(WebSocket conn, int code, String reason, boolean remote) {
+        Integer idCliente = conexoesClientes.remove(conn);
+        if (idCliente != null) {
+            System.out.println("Cliente ID " + idCliente + " desconectado. Motivo: " + reason);
+            
+            // Parar monitoramento do cliente
+            monitoramentoService.pararMonitoramentoCliente(idCliente);
+        }
+    }
+    
+    @Override
+    public void onMessage(WebSocket conn, String message) {
+        try {
+            Integer idCliente = conexoesClientes.get(conn);
+            if (idCliente == null) {
+                conn.send("{\"error\": \"Cliente não autenticado\"}");
+                return;
+            }
+            
+            // Parse do JSON recebido
+            JsonObject json = JsonParser.parseString(message).getAsJsonObject();
+            
+            double tensao = 0;
+            if (json.has("tensao")) {
+                tensao = json.get("tensao").getAsDouble();
+            }
+            
+            long timestamp = System.currentTimeMillis();
+            if (json.has("timestamp")) {
+                timestamp = json.get("timestamp").getAsLong();
+            }
+            
+            // Validar tensão (0-25V esperado para fonte 19V)
+            if (tensao < 0 || tensao > 25) {
+                System.err.println("Tensão inválida recebida do cliente " + idCliente + ": " + tensao);
+                JsonObject error = new JsonObject();
+                error.addProperty("error", "Tensão fora da faixa esperada (0-25V)");
+                conn.send(error.toString());
+                return;
+            }
+            
+            // Processar medição
+            Date dataHora = new Date(timestamp);
+            processarMedicao(idCliente, tensao, dataHora);
+            
+            // Enviar confirmação
+            JsonObject response = new JsonObject();
+            response.addProperty("status", "ok");
+            response.addProperty("tensao_recebida", tensao);
+            response.addProperty("timestamp", timestamp);
+            conn.send(response.toString());
+            
+        } catch (Exception e) {
+            System.err.println("Erro ao processar mensagem: " + e.getMessage());
+            e.printStackTrace();
+            
+            JsonObject error = new JsonObject();
+            error.addProperty("error", "Erro ao processar medição: " + e.getMessage());
+            conn.send(error.toString());
+        }
+    }
+    
+    private void processarMedicao(int idCliente, double tensao, Date dataHora) {
+        // Verificar se cliente está em monitoramento
+        Cliente cliente = clienteDAO.buscarPorId(idCliente);
+        if (cliente == null || !cliente.isEmMonitoramento()) {
+            System.err.println("Cliente " + idCliente + " não está em monitoramento");
+            return;
+        }
+        
+        // Processar medição no serviço de monitoramento
+        monitoramentoService.receberMedicao(idCliente, tensao);
+        
+        System.out.println("Medição processada - Cliente: " + idCliente + 
+                           ", Tensão: " + tensao + "V, Data: " + dataHora);
+    }
+    
+    @Override
+    public void onError(WebSocket conn, Exception ex) {
+        System.err.println("Erro no WebSocket: " + ex.getMessage());
+        ex.printStackTrace();
+    }
+    
+    @Override
+    public void onStart() {
+        System.out.println("Servidor WebSocket iniciado na porta " + PORTA_PADRAO);
+        System.out.println("Aguardando conexões dos ESP32...");
+    }
+    
+    public void atualizarMapeamentoIPs() {
+        ipClienteMap.clear();
+        mapearIPsClientes();
+    }
+}

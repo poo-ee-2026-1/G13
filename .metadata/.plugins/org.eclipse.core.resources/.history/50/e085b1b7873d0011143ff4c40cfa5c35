@@ -1,0 +1,106 @@
+// TelaMonitoramento.java
+package com.monitoramento.ui;
+
+// ... (imports permanecem iguais) ...
+
+public class TelaMonitoramento extends JPanel {
+    // ... (atributos permanecem iguais) ...
+    
+    private int extrairIdCliente(String nomeExibicao) {
+        if (nomeExibicao == null) return -1;
+        
+        try {
+            // Procura pelo padrão "(ID: X)"
+            int startIdx = nomeExibicao.lastIndexOf("(ID: ");
+            if (startIdx >= 0) {
+                startIdx += 5;
+                int endIdx = nomeExibicao.indexOf(")", startIdx);
+                if (endIdx > startIdx) {
+                    return Integer.parseInt(nomeExibicao.substring(startIdx, endIdx));
+                }
+            }
+            
+            // Tenta extrair o ID do início da string (caso esteja no formato "ID - Nome")
+            String[] parts = nomeExibicao.split(" - ");
+            if (parts.length >= 1) {
+                try {
+                    return Integer.parseInt(parts[0].trim());
+                } catch (NumberFormatException e) {
+                    // Ignorar
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao extrair ID do cliente: " + e.getMessage());
+        }
+        return -1;
+    }
+    
+    // Método abrirOSManual corrigido para mostrar mensagem mais clara
+    private void abrirOSManual() {
+        if (ordemServicoService == null) {
+            JOptionPane.showMessageDialog(this, "Serviço de OS não disponível!");
+            return;
+        }
+        
+        int row = tabelaMonitoramento.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, 
+                "⚠️ Selecione um cliente na tabela para abrir uma OS!\n\n" +
+                "Se não há clientes listados, verifique:\n" +
+                "1. Se o cliente está cadastrado\n" +
+                "2. Se o cliente possui equipamento cadastrado\n" +
+                "3. Se a opção 'Em Monitoramento' está marcada no cadastro do cliente",
+                "Nenhum cliente selecionado", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String cliente = (String) tableModel.getValueAt(row, 0);
+        
+        // Verificar se é a linha de "Nenhum cliente em monitoramento"
+        if (cliente != null && cliente.startsWith("Nenhum")) {
+            JOptionPane.showMessageDialog(this, 
+                "⚠️ Não há clientes sendo monitorados no momento!\n\n" +
+                "Para monitorar um cliente:\n" +
+                "1. Acesse Cadastros > Clientes\n" +
+                "2. Selecione ou cadastre um cliente\n" +
+                "3. Marque a opção 'Em Monitoramento'\n" +
+                "4. Cadastre um equipamento para o cliente",
+                "Nenhum cliente monitorado", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        
+        String motivo = JOptionPane.showInputDialog(this, 
+            "Cliente: " + cliente + "\n\nMotivo da Ordem de Serviço (REPARO):\n" +
+            "Descreva o problema ou motivo da abertura da OS:",
+            "Abrir OS - Suporte Técnico", JOptionPane.QUESTION_MESSAGE);
+        
+        if (motivo != null && !motivo.trim().isEmpty()) {
+            int idCliente = extrairIdCliente(cliente);
+            if (idCliente > 0) {
+                var os = ordemServicoService.abrirOrdemServicoManual(idCliente, motivo, usuarioLogado.getId());
+                if (os != null) {
+                    JOptionPane.showMessageDialog(this, 
+                        "✅ OS #" + os.getId() + " (REPARO) aberta com sucesso!\n\n" +
+                        "Cliente: " + cliente + "\n" +
+                        "Motivo: " + motivo + "\n\n" +
+                        "A OS foi encaminhada para o 1º Nível de atendimento.",
+                        "Ordem de Serviço Aberta", JOptionPane.INFORMATION_MESSAGE);
+                    // Atualizar a tabela para refletir possíveis mudanças
+                    carregarClientesMonitorados();
+                } else {
+                    JOptionPane.showMessageDialog(this, 
+                        "❌ Cliente já possui uma OS aberta!\n\n" +
+                        "Feche a OS existente antes de abrir uma nova.",
+                        "Erro ao abrir OS", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "❌ Não foi possível identificar o cliente selecionado!\n\n" +
+                    "Tente atualizar a tela (F5) e selecionar o cliente novamente.",
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    // ... (restante do código permanece igual) ...
+}

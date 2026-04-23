@@ -1,0 +1,31 @@
+[ {
+  "id" : 1,
+  "nome" : "Gerente",
+  "descricao" : "Gerencia o departamento e equipe",
+  "departamento" : "GERAL"
+}, {
+  "id" : 2,
+  "nome" : "Coordenador",
+  "descricao" : "Coordena as atividades da equipe",
+  "departamento" : "GERAL"
+}, {
+  "id" : 3,
+  "nome" : "Atendente",
+  "descricao" : "Realiza atendimento aos clientes",
+  "departamento" : "ATENDIMENTO"
+}, {
+  "id" : 4,
+  "nome" : "Vendedor",
+  "descricao" : "Responsável por vendas",
+  "departamento" : "VENDAS"
+}, {
+  "id" : 5,
+  "nome" : "Auxiliar",
+  "descricao" : "Auxilia nas atividades gerais",
+  "departamento" : "GERAL"
+}, {
+  "id" : 6,
+  "nome" : "Desenvolvedor",
+  "descricao" : "Desenvolve e mantém sistemas",
+  "departamento" : "TI"
+} ]

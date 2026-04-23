@@ -1,0 +1,222 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.Cliente;
+import com.monitoramento.util.DatabaseConnection;
+import com.monitoramento.util.ValidadorCPF;
+import com.monitoramento.util.ValidadorCNPJ;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+public class ClienteDAO {
+    
+    public boolean inserir(Cliente cliente) {
+        String sql = "INSERT INTO clientes (tipo, documento, nome, sobrenome, razao_social, nome_fantasia, " +
+                     "logradouro, numero, bairro, cidade, estado, cep, telefone_ddd, telefone_numero, " +
+                     "ip_cliente, em_monitoramento, data_cadastro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setString(1, cliente.getTipo());
+            stmt.setString(2, cliente.getDocumento());
+            stmt.setString(3, cliente.getNome());
+            stmt.setString(4, cliente.getSobrenome());
+            stmt.setString(5, cliente.getRazaoSocial());
+            stmt.setString(6, cliente.getNomeFantasia());
+            stmt.setString(7, cliente.getLogradouro());
+            stmt.setString(8, cliente.getNumero());
+            stmt.setString(9, cliente.getBairro());
+            stmt.setString(10, cliente.getCidade());
+            stmt.setString(11, cliente.getEstado());
+            stmt.setString(12, cliente.getCep());
+            stmt.setString(13, cliente.getTelefoneDDD());
+            stmt.setString(14, cliente.getTelefoneNumero());
+            stmt.setString(15, cliente.getIpCliente());
+            stmt.setBoolean(16, cliente.isEmMonitoramento());
+            
+            int affectedRows = stmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        cliente.setId(rs.getInt(1));
+                    }
+                }
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean atualizar(Cliente cliente) {
+        String sql = "UPDATE clientes SET tipo = ?, documento = ?, nome = ?, sobrenome = ?, " +
+                     "razao_social = ?, nome_fantasia = ?, logradouro = ?, numero = ?, bairro = ?, " +
+                     "cidade = ?, estado = ?, cep = ?, telefone_ddd = ?, telefone_numero = ?, " +
+                     "ip_cliente = ?, em_monitoramento = ? WHERE id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, cliente.getTipo());
+            stmt.setString(2, cliente.getDocumento());
+            stmt.setString(3, cliente.getNome());
+            stmt.setString(4, cliente.getSobrenome());
+            stmt.setString(5, cliente.getRazaoSocial());
+            stmt.setString(6, cliente.getNomeFantasia());
+            stmt.setString(7, cliente.getLogradouro());
+            stmt.setString(8, cliente.getNumero());
+            stmt.setString(9, cliente.getBairro());
+            stmt.setString(10, cliente.getCidade());
+            stmt.setString(11, cliente.getEstado());
+            stmt.setString(12, cliente.getCep());
+            stmt.setString(13, cliente.getTelefoneDDD());
+            stmt.setString(14, cliente.getTelefoneNumero());
+            stmt.setString(15, cliente.getIpCliente());
+            stmt.setBoolean(16, cliente.isEmMonitoramento());
+            stmt.setInt(17, cliente.getId());
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluir(int id) {
+        String sql = "DELETE FROM clientes WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public Cliente buscarPorId(int id) {
+        String sql = "SELECT * FROM clientes WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearCliente(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public Cliente buscarPorDocumento(String documento) {
+        String sql = "SELECT * FROM clientes WHERE documento = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, documento);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearCliente(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public List<Cliente> listarTodos() {
+        List<Cliente> clientes = new ArrayList<>();
+        String sql = "SELECT * FROM clientes ORDER BY id";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                clientes.add(mapearCliente(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return clientes;
+    }
+    
+    public List<Cliente> listarPorMonitoramento(boolean emMonitoramento) {
+        List<Cliente> clientes = new ArrayList<>();
+        String sql = "SELECT * FROM clientes WHERE em_monitoramento = ? ORDER BY id";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setBoolean(1, emMonitoramento);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    clientes.add(mapearCliente(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return clientes;
+    }
+    
+    public boolean adicionarMonitoramento(int id) {
+        String sql = "UPDATE clientes SET em_monitoramento = true WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean removerMonitoramento(int id) {
+        String sql = "UPDATE clientes SET em_monitoramento = false WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    private Cliente mapearCliente(ResultSet rs) throws SQLException {
+        Cliente cliente = new Cliente();
+        cliente.setId(rs.getInt("id"));
+        cliente.setTipo(rs.getString("tipo"));
+        cliente.setDocumento(rs.getString("documento"));
+        cliente.setNome(rs.getString("nome"));
+        cliente.setSobrenome(rs.getString("sobrenome"));
+        cliente.setRazaoSocial(rs.getString("razao_social"));
+        cliente.setNomeFantasia(rs.getString("nome_fantasia"));
+        cliente.setLogradouro(rs.getString("logradouro"));
+        cliente.setNumero(rs.getString("numero"));
+        cliente.setBairro(rs.getString("bairro"));
+        cliente.setCidade(rs.getString("cidade"));
+        cliente.setEstado(rs.getString("estado"));
+        cliente.setCep(rs.getString("cep"));
+        cliente.setTelefoneDDD(rs.getString("telefone_ddd"));
+        cliente.setTelefoneNumero(rs.getString("telefone_numero"));
+        cliente.setIpCliente(rs.getString("ip_cliente"));
+        cliente.setEmMonitoramento(rs.getBoolean("em_monitoramento"));
+        cliente.setDataCadastro(rs.getTimestamp("data_cadastro"));
+        return cliente;
+    }
+}

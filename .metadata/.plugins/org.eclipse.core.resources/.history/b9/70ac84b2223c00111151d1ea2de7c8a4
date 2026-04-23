@@ -1,0 +1,321 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+public class OrdemServicoDAO {
+    
+    public boolean inserir(OrdemServico os) {
+        String sql = "INSERT INTO ordens_servico (id_cliente, id_equipamento, tipo_nivel, status, motivo, " +
+                     "descricao_solucao, falha_identificada, data_abertura, data_fechamento, " +
+                     "id_usuario_abertura, id_usuario_fechamento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setInt(1, os.getIdCliente());
+            stmt.setInt(2, os.getIdEquipamento());
+            stmt.setString(3, os.getTipoNivel());
+            stmt.setString(4, os.getStatus());
+            stmt.setString(5, os.getMotivo());
+            stmt.setString(6, os.getDescricaoSolucao());
+            stmt.setString(7, os.getFalhaIdentificada());
+            stmt.setTimestamp(8, os.getDataAbertura() != null ? new Timestamp(os.getDataAbertura().getTime()) : null);
+            stmt.setTimestamp(9, os.getDataFechamento() != null ? new Timestamp(os.getDataFechamento().getTime()) : null);
+            stmt.setInt(10, os.getIdUsuarioAbertura());
+            stmt.setObject(11, os.getIdUsuarioFechamento() > 0 ? os.getIdUsuarioFechamento() : null);
+            
+            int affectedRows = stmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        os.setId(rs.getInt(1));
+                    }
+                }
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean atualizar(OrdemServico os) {
+        String sql = "UPDATE ordens_servico SET id_cliente = ?, id_equipamento = ?, tipo_nivel = ?, " +
+                     "status = ?, motivo = ?, descricao_solucao = ?, falha_identificada = ?, " +
+                     "data_abertura = ?, data_fechamento = ?, id_usuario_abertura = ?, " +
+                     "id_usuario_fechamento = ? WHERE id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, os.getIdCliente());
+            stmt.setInt(2, os.getIdEquipamento());
+            stmt.setString(3, os.getTipoNivel());
+            stmt.setString(4, os.getStatus());
+            stmt.setString(5, os.getMotivo());
+            stmt.setString(6, os.getDescricaoSolucao());
+            stmt.setString(7, os.getFalhaIdentificada());
+            stmt.setTimestamp(8, os.getDataAbertura() != null ? new Timestamp(os.getDataAbertura().getTime()) : null);
+            stmt.setTimestamp(9, os.getDataFechamento() != null ? new Timestamp(os.getDataFechamento().getTime()) : null);
+            stmt.setInt(10, os.getIdUsuarioAbertura());
+            stmt.setObject(11, os.getIdUsuarioFechamento() > 0 ? os.getIdUsuarioFechamento() : null);
+            stmt.setInt(12, os.getId());
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluir(int id) {
+        String sql = "DELETE FROM ordens_servico WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public OrdemServico buscarPorId(int id) {
+        String sql = "SELECT * FROM ordens_servico WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearOrdemServico(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public List<OrdemServico> listarTodas() {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                ordens.add(mapearOrdemServico(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public List<OrdemServico> buscarPorStatus(String status) {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico WHERE status = ? ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, status);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ordens.add(mapearOrdemServico(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public List<OrdemServico> buscarPorCliente(int idCliente) {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico WHERE id_cliente = ? ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ordens.add(mapearOrdemServico(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public List<OrdemServico> buscarPorPeriodo(Date dataInicio, Date dataFim) {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico WHERE data_abertura BETWEEN ? AND ? ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setTimestamp(1, new Timestamp(dataInicio.getTime()));
+            stmt.setTimestamp(2, new Timestamp(dataFim.getTime()));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ordens.add(mapearOrdemServico(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public List<OrdemServico> buscarPorNivel(String tipoNivel) {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico WHERE tipo_nivel = ? ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, tipoNivel);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ordens.add(mapearOrdemServico(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public boolean fecharOrdemServico(int id, String descricaoSolucao, String falhaIdentificada, int idUsuarioFechamento) {
+        String sql = "UPDATE ordens_servico SET status = 'FECHADA', descricao_solucao = ?, " +
+                     "falha_identificada = ?, data_fechamento = ?, id_usuario_fechamento = ? WHERE id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, descricaoSolucao);
+            stmt.setString(2, falhaIdentificada);
+            stmt.setTimestamp(3, new Timestamp(new Date().getTime()));
+            stmt.setInt(4, idUsuarioFechamento);
+            stmt.setInt(5, id);
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean atualizarStatus(int id, String status) {
+        String sql = "UPDATE ordens_servico SET status = ? WHERE id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, status);
+            stmt.setInt(2, id);
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public List<OrdemServico> buscarOrdensAbertasPorCliente(int idCliente) {
+        List<OrdemServico> ordens = new ArrayList<>();
+        String sql = "SELECT * FROM ordens_servico WHERE id_cliente = ? AND status != 'FECHADA' ORDER BY data_abertura DESC";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ordens.add(mapearOrdemServico(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ordens;
+    }
+    
+    public int contarOrdensPorPeriodo(Date dataInicio, Date dataFim) {
+        String sql = "SELECT COUNT(*) FROM ordens_servico WHERE data_abertura BETWEEN ? AND ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setTimestamp(1, new Timestamp(dataInicio.getTime()));
+            stmt.setTimestamp(2, new Timestamp(dataFim.getTime()));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    public double calcularTempoMedioResolucao(Date dataInicio, Date dataFim) {
+        String sql = "SELECT AVG(TIMESTAMPDIFF(HOUR, data_abertura, data_fechamento)) as media_horas " +
+                     "FROM ordens_servico WHERE status = 'FECHADA' AND data_fechamento BETWEEN ? AND ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setTimestamp(1, new Timestamp(dataInicio.getTime()));
+            stmt.setTimestamp(2, new Timestamp(dataFim.getTime()));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("media_horas");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    private OrdemServico mapearOrdemServico(ResultSet rs) throws SQLException {
+        OrdemServico os = new OrdemServico();
+        os.setId(rs.getInt("id"));
+        os.setIdCliente(rs.getInt("id_cliente"));
+        os.setIdEquipamento(rs.getInt("id_equipamento"));
+        os.setTipoNivel(rs.getString("tipo_nivel"));
+        os.setStatus(rs.getString("status"));
+        os.setMotivo(rs.getString("motivo"));
+        os.setDescricaoSolucao(rs.getString("descricao_solucao"));
+        os.setFalhaIdentificada(rs.getString("falha_identificada"));
+        
+        Timestamp tsAbertura = rs.getTimestamp("data_abertura");
+        if (tsAbertura != null) {
+            os.setDataAbertura(new Date(tsAbertura.getTime()));
+        }
+        
+        Timestamp tsFechamento = rs.getTimestamp("data_fechamento");
+        if (tsFechamento != null) {
+            os.setDataFechamento(new Date(tsFechamento.getTime()));
+        }
+        
+        os.setIdUsuarioAbertura(rs.getInt("id_usuario_abertura"));
+        
+        int idUsuarioFechamento = rs.getInt("id_usuario_fechamento

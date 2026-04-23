@@ -1,0 +1,802 @@
+// TelaOrdemInstalacao.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.model.ProdutoEstoque;
+import com.monitoramento.model.InstalacaoProduto;
+import com.monitoramento.model.TransacaoFinanceira;
+import com.monitoramento.dao.OrdemServicoDAO;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.ProdutoEstoqueDAO;
+import com.monitoramento.dao.InstalacaoProdutoDAO;
+import com.monitoramento.dao.TransacaoFinanceiraDAO;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaOrdemInstalacao extends JPanel {
+    private OrdemServicoDAO ordemServicoDAO;
+    private ClienteDAO clienteDAO;
+    private ProdutoEstoqueDAO produtoDAO;
+    private InstalacaoProdutoDAO instalacaoProdutoDAO;
+    private TransacaoFinanceiraDAO transacaoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOrdensInstalacao;
+    private DefaultTableModel modelOrdensInstalacao;
+    private JComboBox<String> comboClienteInstalacao, comboStatusInstalacao;
+    private JTextArea txtDescricaoInstalacao, txtObservacoesInstalacao;
+    private JTextField txtEnderecoInstalacao, txtDataAgendamento, txtValorTotalInstalacao;
+    private JButton btnAbrirInstalacao, btnConcluirInstalacao, btnAtualizarInstalacoes, btnSelecionarProdutos;
+    private JTable tabelaProdutosSelecionados;
+    private DefaultTableModel modelProdutosSelecionados;
+    private List<ProdutoSelecionado> produtosSelecionados;
+    
+    public TelaOrdemInstalacao(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        this.clienteDAO = new ClienteDAO();
+        this.produtoDAO = new ProdutoEstoqueDAO();
+        this.instalacaoProdutoDAO = new InstalacaoProdutoDAO();
+        this.transacaoDAO = new TransacaoFinanceiraDAO();
+        this.produtosSelecionados = new ArrayList<>();
+        
+        initComponents();
+        carregarOrdensInstalacao();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        painelFiltros.add(new JLabel("Status:"));
+        comboStatusInstalacao = new JComboBox<>(new String[]{"TODAS", "ABERTA", "FECHADA"});
+        
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboClienteInstalacao = new JComboBox<>();
+        comboClienteInstalacao.setPreferredSize(new Dimension(250, 25));
+        carregarClientesCombo(comboClienteInstalacao);
+        
+        JButton btnFiltrar = new JButton("Filtrar");
+        JButton btnLimpar = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarOrdensInstalacao());
+        btnLimpar.addActionListener(e -> {
+            comboStatusInstalacao.setSelectedIndex(0);
+            comboClienteInstalacao.setSelectedIndex(0);
+            carregarOrdensInstalacao();
+        });
+        
+        painelFiltros.add(comboStatusInstalacao);
+        painelFiltros.add(comboClienteInstalacao);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        String[] colunas = {"ID", "Cliente", "Status", "Data Abertura", "Valor Total (R$)", "Data Agendamento", "Endereço"};
+        modelOrdensInstalacao = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOrdensInstalacao = new JTable(modelOrdensInstalacao);
+        tabelaOrdensInstalacao.setRowHeight(25);
+        tabelaOrdensInstalacao.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                carregarDetalhesInstalacao();
+            }
+        });
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaOrdensInstalacao);
+        
+        JPanel painelDetalhes = new JPanel(new BorderLayout());
+        painelDetalhes.setBorder(BorderFactory.createTitledBorder("Detalhes da Instalação"));
+        
+        JPanel painelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        painelCampos.add(new JLabel("Cliente:"), gbc);
+        JComboBox<String> comboCliente = new JComboBox<>();
+        comboCliente.setPreferredSize(new Dimension(250, 25));
+        carregarClientesCombo(comboCliente);
+        gbc.gridx = 1;
+        painelCampos.add(comboCliente, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        painelCampos.add(new JLabel("Endereço de Instalação:*"), gbc);
+        txtEnderecoInstalacao = new JTextField(30);
+        gbc.gridx = 1;
+        painelCampos.add(txtEnderecoInstalacao, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        painelCampos.add(new JLabel("Data Agendamento:*"), gbc);
+        txtDataAgendamento = new JTextField(15);
+        txtDataAgendamento.setToolTipText("dd/MM/yyyy");
+        gbc.gridx = 1;
+        painelCampos.add(txtDataAgendamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        painelCampos.add(new JLabel("Descrição:"), gbc);
+        txtDescricaoInstalacao = new JTextArea(3, 30);
+        txtDescricaoInstalacao.setLineWrap(true);
+        JScrollPane scrollDesc = new JScrollPane(txtDescricaoInstalacao);
+        gbc.gridx = 1;
+        painelCampos.add(scrollDesc, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        painelCampos.add(new JLabel("Observações:"), gbc);
+        txtObservacoesInstalacao = new JTextArea(2, 30);
+        txtObservacoesInstalacao.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObservacoesInstalacao);
+        gbc.gridx = 1;
+        painelCampos.add(scrollObs, gbc);
+        
+        JPanel painelProdutos = new JPanel(new BorderLayout());
+        painelProdutos.setBorder(BorderFactory.createTitledBorder("Produtos para Instalação"));
+        
+        String[] colunasProdutos = {"Produto", "Quantidade", "Preço Unitário (R$)", "Subtotal (R$)"};
+        modelProdutosSelecionados = new DefaultTableModel(colunasProdutos, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaProdutosSelecionados = new JTable(modelProdutosSelecionados);
+        tabelaProdutosSelecionados.setRowHeight(25);
+        JScrollPane scrollProdutos = new JScrollPane(tabelaProdutosSelecionados);
+        
+        btnSelecionarProdutos = new JButton("Adicionar Produtos");
+        btnSelecionarProdutos.setBackground(new Color(70, 130, 180));
+        btnSelecionarProdutos.setForeground(Color.WHITE);
+        btnSelecionarProdutos.setFont(new Font("Arial", Font.BOLD, 11));
+        btnSelecionarProdutos.setPreferredSize(new Dimension(200, 28));
+        btnSelecionarProdutos.setMaximumSize(new Dimension(200, 28));
+        btnSelecionarProdutos.setMinimumSize(new Dimension(200, 28));
+        btnSelecionarProdutos.addActionListener(e -> selecionarProdutos());
+        
+        JPanel panelBotoesProdutos = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        panelBotoesProdutos.add(btnSelecionarProdutos);
+        
+        painelProdutos.add(scrollProdutos, BorderLayout.CENTER);
+        painelProdutos.add(panelBotoesProdutos, BorderLayout.SOUTH);
+        
+        JPanel painelValor = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        painelValor.add(new JLabel("Valor Total da Instalação (R$):"));
+        txtValorTotalInstalacao = new JTextField(15);
+        txtValorTotalInstalacao.setEditable(false);
+        painelValor.add(txtValorTotalInstalacao);
+        
+        JPanel painelBotoes = new JPanel(new FlowLayout());
+        
+        btnAbrirInstalacao = new JButton("Abrir OI (INSTALAÇÃO)");
+        btnConcluirInstalacao = new JButton("Fechar OI");
+        btnAtualizarInstalacoes = new JButton("Atualizar");
+        
+        btnAbrirInstalacao.setBackground(new Color(60, 120, 60));
+        btnAbrirInstalacao.setForeground(Color.WHITE);
+        btnAbrirInstalacao.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnConcluirInstalacao.setBackground(new Color(180, 60, 60));
+        btnConcluirInstalacao.setForeground(Color.WHITE);
+        btnConcluirInstalacao.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnAtualizarInstalacoes.setBackground(new Color(70, 130, 180));
+        btnAtualizarInstalacoes.setForeground(Color.WHITE);
+        btnAtualizarInstalacoes.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnAbrirInstalacao.addActionListener(e -> abrirOrdemInstalacao(comboCliente));
+        btnConcluirInstalacao.addActionListener(e -> concluirInstalacao());
+        btnAtualizarInstalacoes.addActionListener(e -> carregarOrdensInstalacao());
+        
+        painelBotoes.add(btnAbrirInstalacao);
+        painelBotoes.add(btnConcluirInstalacao);
+        painelBotoes.add(btnAtualizarInstalacoes);
+        
+        painelDetalhes.add(painelCampos, BorderLayout.NORTH);
+        painelDetalhes.add(painelProdutos, BorderLayout.CENTER);
+        painelDetalhes.add(painelValor, BorderLayout.SOUTH);
+        
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        JButton btnRefresh = new JButton("Atualizar");
+        btnRefresh.addActionListener(e -> carregarOrdensInstalacao());
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelFiltros, BorderLayout.CENTER);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(scrollTabela, BorderLayout.CENTER);
+        
+        JPanel painelSul = new JPanel(new BorderLayout());
+        painelSul.add(painelDetalhes, BorderLayout.CENTER);
+        painelSul.add(painelBotoes, BorderLayout.SOUTH);
+        add(painelSul, BorderLayout.SOUTH);
+    }
+    
+    private void carregarClientesCombo(JComboBox<String> combo) {
+        combo.removeAllItems();
+        combo.addItem("SELECIONE");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            combo.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private void carregarOrdensInstalacao() {
+        modelOrdensInstalacao.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        List<OrdemServico> ordensInstalacao = ordemServicoDAO.listarOsInstalacao();
+        
+        for (OrdemServico os : ordensInstalacao) {
+            Cliente cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            Object[] row = {
+                os.getId(),
+                nomeCliente,
+                os.getStatus(),
+                os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                String.format("%.2f", os.getValorTotal()),
+                os.getDataAgendamento() != null ? os.getDataAgendamento() : "",
+                os.getEnderecoInstalacao() != null ? os.getEnderecoInstalacao() : ""
+            };
+            modelOrdensInstalacao.addRow(row);
+        }
+    }
+    
+    private void filtrarOrdensInstalacao() {
+        String status = (String) comboStatusInstalacao.getSelectedItem();
+        String clienteSelecionado = (String) comboClienteInstalacao.getSelectedItem();
+        
+        List<OrdemServico> ordens = ordemServicoDAO.listarOsInstalacao();
+        
+        if (!"TODAS".equals(status)) {
+            ordens = ordens.stream()
+                .filter(os -> os.getStatus() != null && os.getStatus().equals(status))
+                .toList();
+        }
+        
+        if (clienteSelecionado != null && !"SELECIONE".equals(clienteSelecionado)) {
+            int idCliente = Integer.parseInt(clienteSelecionado.split(" - ")[0]);
+            ordens = ordens.stream()
+                .filter(os -> os.getIdCliente() == idCliente)
+                .toList();
+        }
+        
+        modelOrdensInstalacao.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (OrdemServico os : ordens) {
+            Cliente cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            Object[] row = {
+                os.getId(),
+                nomeCliente,
+                os.getStatus(),
+                os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                String.format("%.2f", os.getValorTotal()),
+                os.getDataAgendamento() != null ? os.getDataAgendamento() : "",
+                os.getEnderecoInstalacao() != null ? os.getEnderecoInstalacao() : ""
+            };
+            modelOrdensInstalacao.addRow(row);
+        }
+    }
+    
+    private void carregarDetalhesInstalacao() {
+        int row = tabelaOrdensInstalacao.getSelectedRow();
+        if (row >= 0) {
+            int idOS = (int) modelOrdensInstalacao.getValueAt(row, 0);
+            OrdemServico os = ordemServicoDAO.buscarPorId(idOS);
+            
+            if (os != null) {
+                txtEnderecoInstalacao.setText(os.getEnderecoInstalacao() != null ? os.getEnderecoInstalacao() : "");
+                txtDataAgendamento.setText(os.getDataAgendamento() != null ? os.getDataAgendamento() : "");
+                txtDescricaoInstalacao.setText(os.getDescricaoSolucao() != null ? os.getDescricaoSolucao() : "");
+                txtObservacoesInstalacao.setText(os.getObservacoes() != null ? os.getObservacoes() : "");
+                txtValorTotalInstalacao.setText(String.format("%.2f", os.getValorTotal()));
+                
+                carregarProdutosInstalacao(idOS);
+                
+                btnConcluirInstalacao.setEnabled(!"FECHADA".equals(os.getStatus()));
+            }
+        } else {
+            limparCamposInstalacao();
+        }
+    }
+    
+    private void carregarProdutosInstalacao(int idOrdemInstalacao) {
+        modelProdutosSelecionados.setRowCount(0);
+        
+        List<InstalacaoProduto> itens = instalacaoProdutoDAO.listarPorOrdemInstalacao(idOrdemInstalacao);
+        
+        for (InstalacaoProduto item : itens) {
+            ProdutoEstoque produto = produtoDAO.buscarPorId(item.getIdProduto());
+            String nomeProduto = produto != null ? produto.getNome() : "Produto ID: " + item.getIdProduto();
+            
+            Object[] row = {
+                nomeProduto,
+                item.getQuantidade(),
+                String.format("%.2f", item.getPrecoUnitario()),
+                String.format("%.2f", item.getSubtotal())
+            };
+            modelProdutosSelecionados.addRow(row);
+        }
+    }
+    
+    private void limparCamposInstalacao() {
+        txtEnderecoInstalacao.setText("");
+        txtDataAgendamento.setText("");
+        txtDescricaoInstalacao.setText("");
+        txtObservacoesInstalacao.setText("");
+        txtValorTotalInstalacao.setText("0,00");
+        modelProdutosSelecionados.setRowCount(0);
+        btnConcluirInstalacao.setEnabled(true);
+    }
+    
+    private void selecionarProdutos() {
+        List<ProdutoEstoque> produtos = produtoDAO.listarAtivos();
+        
+        if (produtos.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nenhum produto cadastrado no estoque!\nCadastre produtos primeiro.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Selecionar Produtos", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setSize(600, 500);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+        
+        String[] colunas = {"ID", "Código", "Nome", "Preço Venda (R$)", "Estoque", "Selecionar"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 5;
+            }
+            
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 5) return Boolean.class;
+                return super.getColumnClass(columnIndex);
+            }
+        };
+        
+        for (ProdutoEstoque p : produtos) {
+            Object[] row = {
+                p.getId(),
+                p.getCodigo(),
+                p.getNome(),
+                String.format("%.2f", p.getPrecoVenda()),
+                p.getQuantidade(),
+                Boolean.FALSE
+            };
+            model.addRow(row);
+        }
+        
+        JTable tabelaProdutos = new JTable(model);
+        tabelaProdutos.setRowHeight(25);
+        JScrollPane scroll = new JScrollPane(tabelaProdutos);
+        
+        JPanel painelBotoes = new JPanel();
+        JButton btnAdicionar = new JButton("Adicionar Selecionados");
+        JButton btnCancelar = new JButton("Cancelar");
+        
+        btnAdicionar.addActionListener(e -> {
+            produtosSelecionados.clear();
+            
+            for (int i = 0; i < model.getRowCount(); i++) {
+                Boolean selecionado = (Boolean) model.getValueAt(i, 5);
+                if (selecionado != null && selecionado) {
+                    int idProduto = (int) model.getValueAt(i, 0);
+                    ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+                    
+                    String quantidadeStr = JOptionPane.showInputDialog(dialog, 
+                        "Quantidade de " + produto.getNome() + ":\nEstoque disponível: " + produto.getQuantidade(),
+                        "Quantidade", JOptionPane.QUESTION_MESSAGE);
+                    
+                    if (quantidadeStr != null && !quantidadeStr.trim().isEmpty()) {
+                        try {
+                            int quantidade = Integer.parseInt(quantidadeStr.trim());
+                            if (quantidade <= 0) {
+                                JOptionPane.showMessageDialog(dialog, "Quantidade deve ser maior que zero!");
+                                continue;
+                            }
+                            if (quantidade > produto.getQuantidade()) {
+                                JOptionPane.showMessageDialog(dialog, "Quantidade insuficiente em estoque!\nDisponível: " + produto.getQuantidade());
+                                continue;
+                            }
+                            
+                            produtosSelecionados.add(new ProdutoSelecionado(produto, quantidade));
+                        } catch (NumberFormatException ex) {
+                            JOptionPane.showMessageDialog(dialog, "Quantidade inválida!");
+                        }
+                    }
+                }
+            }
+            
+            atualizarListaProdutosSelecionados();
+            dialog.dispose();
+        });
+        
+        btnCancelar.addActionListener(e -> dialog.dispose());
+        
+        painelBotoes.add(btnAdicionar);
+        painelBotoes.add(btnCancelar);
+        
+        dialog.add(scroll, BorderLayout.CENTER);
+        dialog.add(painelBotoes, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+    
+    private void atualizarListaProdutosSelecionados() {
+        modelProdutosSelecionados.setRowCount(0);
+        double total = 0;
+        
+        for (ProdutoSelecionado ps : produtosSelecionados) {
+            double subtotal = ps.getQuantidade() * ps.getProduto().getPrecoVenda();
+            total += subtotal;
+            
+            Object[] row = {
+                ps.getProduto().getNome(),
+                ps.getQuantidade(),
+                String.format("%.2f", ps.getProduto().getPrecoVenda()),
+                String.format("%.2f", subtotal)
+            };
+            modelProdutosSelecionados.addRow(row);
+        }
+        
+        txtValorTotalInstalacao.setText(String.format("%.2f", total));
+    }
+    
+    private void abrirOrdemInstalacao(JComboBox<String> comboCliente) {
+        if (comboCliente.getSelectedIndex() == -1 || "SELECIONE".equals(comboCliente.getSelectedItem())) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return;
+        }
+        
+        String endereco = txtEnderecoInstalacao.getText().trim();
+        if (endereco.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Endereço de instalação é obrigatório!");
+            return;
+        }
+        
+        String dataAgendamento = txtDataAgendamento.getText().trim();
+        if (dataAgendamento.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Data de agendamento é obrigatória!");
+            return;
+        }
+        
+        if (produtosSelecionados.isEmpty()) {
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Nenhum produto selecionado. Deseja continuar mesmo assim?",
+                "Aviso", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+        
+        int idCliente = Integer.parseInt(((String) comboCliente.getSelectedItem()).split(" - ")[0]);
+        
+        double valorTotal = 0;
+        for (ProdutoSelecionado ps : produtosSelecionados) {
+            valorTotal += ps.getQuantidade() * ps.getProduto().getPrecoVenda();
+        }
+        
+        String motivo = "ORDEM DE INSTALAÇÃO - " + txtDescricaoInstalacao.getText().trim();
+        
+        OrdemServicoService osService = Main.getOrdemServicoService();
+        OrdemServico os = null;
+        
+        if (osService != null) {
+            os = osService.abrirOSInstalacao(idCliente, motivo, usuarioLogado.getId(), valorTotal, endereco, dataAgendamento);
+            if (os != null) {
+                os.setDescricaoSolucao(txtDescricaoInstalacao.getText().trim());
+                os.setObservacoes(txtObservacoesInstalacao.getText().trim());
+                ordemServicoDAO.atualizar(os);
+            }
+        } else {
+            os = new OrdemServico();
+            os.setIdCliente(idCliente);
+            os.setIdEquipamento(0);
+            os.setTipoNivel("1º Nível");
+            os.setStatus("ABERTA");
+            os.setMotivo(motivo);
+            os.setDataAbertura(new Date());
+            os.setIdUsuarioAbertura(usuarioLogado.getId());
+            os.setTipoOrdem("INSTALACAO");
+            os.setTipoOs("INSTALACAO");
+            os.setDepartamentoOrigem("VENDAS");
+            os.setValorTotal(valorTotal);
+            os.setEnderecoInstalacao(endereco);
+            os.setDataAgendamento(dataAgendamento);
+            os.setObservacoes(txtObservacoesInstalacao.getText().trim());
+            os.setDescricaoSolucao(txtDescricaoInstalacao.getText().trim());
+            
+            ordemServicoDAO.inserir(os);
+        }
+        
+        if (os != null && os.getId() > 0) {
+            for (ProdutoSelecionado ps : produtosSelecionados) {
+                InstalacaoProduto item = new InstalacaoProduto();
+                item.setIdOrdemInstalacao(os.getId());
+                item.setIdProduto(ps.getProduto().getId());
+                item.setQuantidade(ps.getQuantidade());
+                item.setPrecoUnitario(ps.getProduto().getPrecoVenda());
+                item.setSubtotal(ps.getQuantidade() * ps.getProduto().getPrecoVenda());
+                instalacaoProdutoDAO.inserir(item);
+                
+                produtoDAO.darBaixaEstoque(ps.getProduto().getId(), ps.getQuantidade(), 
+                    "INSTALACAO", os.getId(), usuarioLogado.getId());
+            }
+            
+            JOptionPane.showMessageDialog(this, 
+                "Ordem de Instalação #" + os.getId() + " (INSTALAÇÃO) aberta com sucesso!\n\n" +
+                "Cliente: " + comboCliente.getSelectedItem() + "\n" +
+                "Valor Total: R$ " + String.format("%.2f", valorTotal) + "\n" +
+                "Data Agendamento: " + dataAgendamento,
+                "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            
+            produtosSelecionados.clear();
+            limparCamposInstalacao();
+            carregarOrdensInstalacao();
+            
+            int confirm = JOptionPane.showConfirmDialog(this,
+                "Deseja registrar uma transação financeira para esta instalação agora?",
+                "Registrar Transação", JOptionPane.YES_NO_OPTION);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                registrarTransacaoParaInstalacao(os.getId(), idCliente, valorTotal);
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Lembre-se: Ao concluir a instalação, uma conta a receber será gerada automaticamente!",
+                    "Informação", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao abrir ordem de instalação!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void registrarTransacaoParaInstalacao(int idOS, int idCliente, double valorTotal) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Valor (R$):"), gbc);
+        JTextField txtValor = new JTextField(String.format("%.2f", valorTotal), 15);
+        gbc.gridx = 1;
+        panel.add(txtValor, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Forma de Pagamento:*"), gbc);
+        JComboBox<String> comboForma = new JComboBox<>(new String[]{"DINHEIRO", "PIX", "CARTAO_DEBITO", "CARTAO_CREDITO", "TRANSFERENCIA", "BOLETO"});
+        gbc.gridx = 1;
+        panel.add(comboForma, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Status:"), gbc);
+        JComboBox<String> comboStatus = new JComboBox<>(new String[]{"PENDENTE", "RECEBIDO"});
+        gbc.gridx = 1;
+        panel.add(comboStatus, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(new JLabel("Data Vencimento:"), gbc);
+        JSpinner spDataVencimento = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spDataVencimento, "dd/MM/yyyy");
+        spDataVencimento.setEditor(editor);
+        spDataVencimento.setValue(new Date());
+        gbc.gridx = 1;
+        panel.add(spDataVencimento, gbc);
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Registrar Transação - Instalação #" + idOS, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                double valor = Double.parseDouble(txtValor.getText().trim().replace(",", "."));
+                if (valor <= 0) {
+                    JOptionPane.showMessageDialog(this, "Valor deve ser maior que zero!");
+                    return;
+                }
+                
+                TransacaoFinanceira transacao = new TransacaoFinanceira();
+                transacao.setTipo("ENTRADA");
+                transacao.setNatureza("Instalação");
+                transacao.setFormaPagamento((String) comboForma.getSelectedItem());
+                transacao.setValor(valor);
+                transacao.setDescricao("Instalação - OS #" + idOS);
+                transacao.setStatus((String) comboStatus.getSelectedItem());
+                transacao.setDataVencimento((Date) spDataVencimento.getValue());
+                transacao.setIdCliente(idCliente);
+                transacao.setIdOrdemServico(idOS);
+                transacao.setIdUsuarioRegistro(usuarioLogado.getId());
+                
+                if ("RECEBIDO".equals(transacao.getStatus())) {
+                    transacao.setDataPagamento(new Date());
+                }
+                
+                if (transacaoDAO.inserir(transacao)) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Transação registrada com sucesso!\n" +
+                        (transacao.getStatus().equals("PENDENTE") ? 
+                            "Lembre-se de registrar o recebimento quando o pagamento for efetuado." : 
+                            "Pagamento registrado como recebido."));
+                } else {
+                    JOptionPane.showMessageDialog(this, "Erro ao registrar transação!", "Erro", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Valor inválido!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * Gera automaticamente uma conta a receber quando a instalação é concluída
+     */
+    private void gerarContaReceberAoConcluir(OrdemServico os) {
+        // Verificar se já existe uma transação para esta OS
+        List<TransacaoFinanceira> transacoesExistentes = transacaoDAO.listarTodas().stream()
+            .filter(t -> t.getIdOrdemServico() == os.getId())
+            .toList();
+        
+        if (!transacoesExistentes.isEmpty()) {
+            // Se já existe transação, não criar duplicada
+            JOptionPane.showMessageDialog(this, 
+                "Nota: Já existe uma transação registrada para esta instalação.\n" +
+                "Conta a receber não foi gerada automaticamente para evitar duplicidade.",
+                "Informação", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        
+        // Calcular a data de vencimento (30 dias após a conclusão por padrão)
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_MONTH, 30);
+        Date dataVencimento = cal.getTime();
+        
+        // Criar a transação como PENDENTE (conta a receber)
+        TransacaoFinanceira transacao = new TransacaoFinanceira();
+        transacao.setTipo("ENTRADA");
+        transacao.setNatureza("Instalação");
+        transacao.setFormaPagamento("A_DEFINIR");
+        transacao.setValor(os.getValorTotal());
+        transacao.setDescricao("Instalação concluída - OS #" + os.getId() + " - " + 
+                              (os.getDescricaoSolucao() != null ? os.getDescricaoSolucao() : "Serviço de instalação"));
+        transacao.setStatus("PENDENTE");
+        transacao.setDataVencimento(dataVencimento);
+        transacao.setIdCliente(os.getIdCliente());
+        transacao.setIdOrdemServico(os.getId());
+        transacao.setIdUsuarioRegistro(usuarioLogado.getId());
+        
+        if (transacaoDAO.inserir(transacao)) {
+            // Buscar o cliente para exibir o nome
+            Cliente cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "Cliente ID: " + os.getIdCliente();
+            
+            JOptionPane.showMessageDialog(this, 
+                "✅ Conta a receber gerada automaticamente!\n\n" +
+                "OS #" + os.getId() + " - Instalação concluída\n" +
+                "Cliente: " + nomeCliente + "\n" +
+                "Valor: R$ " + String.format("%.2f", os.getValorTotal()) + "\n" +
+                "Vencimento: " + new SimpleDateFormat("dd/MM/yyyy").format(dataVencimento) + "\n\n" +
+                "A transação foi registrada como PENDENTE no módulo Financeiro.\n" +
+                "Acesse Financeiro > Contas à Receber para registrar o pagamento.",
+                "Conta a Receber Gerada", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "⚠️ Aviso: A instalação foi concluída, mas houve erro ao gerar a conta a receber.\n" +
+                "Por favor, registre a transação manualmente no módulo Financeiro.",
+                "Erro ao Gerar Conta", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+    
+    private void concluirInstalacao() {
+        int row = tabelaOrdensInstalacao.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione uma ordem de instalação para concluir!");
+            return;
+        }
+        
+        int idOS = (int) modelOrdensInstalacao.getValueAt(row, 0);
+        String status = (String) modelOrdensInstalacao.getValueAt(row, 2);
+        
+        if ("FECHADA".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Esta ordem de instalação já está concluída!");
+            return;
+        }
+        
+        OrdemServico os = ordemServicoDAO.buscarPorId(idOS);
+        if (os == null) {
+            JOptionPane.showMessageDialog(this, "Ordem de serviço não encontrada!");
+            return;
+        }
+        
+        // Painel para informações adicionais na conclusão
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Observações sobre a conclusão:"), gbc);
+        JTextArea txtObsConclusao = new JTextArea(3, 40);
+        txtObsConclusao.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObsConclusao);
+        gbc.gridy = 1;
+        panel.add(scrollObs, gbc);
+        
+        gbc.gridy = 2;
+        panel.add(new JLabel("Deseja gerar conta a receber automaticamente?"), gbc);
+        JCheckBox chkGerarConta = new JCheckBox("Sim, gerar conta a receber", true);
+        chkGerarConta.setFont(new Font("Arial", Font.BOLD, 12));
+        chkGerarConta.setForeground(new Color(0, 100, 0));
+        gbc.gridy = 3;
+        panel.add(chkGerarConta, gbc);
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Concluir Instalação - OS #" + idOS, 
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            String observacoes = txtObsConclusao.getText().trim();
+            String observacoesCompletas = observacoes.isEmpty() ? 
+                "Instalação concluída com sucesso." : 
+                "Instalação concluída. Observações: " + observacoes;
+            
+            if (ordemServicoDAO.concluirInstalacao(idOS, observacoesCompletas, usuarioLogado.getId())) {
+                JOptionPane.showMessageDialog(this, 
+                    "✅ Ordem de Instalação #" + idOS + " concluída com sucesso!");
+                
+                // Gerar conta a receber se solicitado
+                if (chkGerarConta.isSelected() && os.getValorTotal() > 0) {
+                    gerarContaReceberAoConcluir(os);
+                } else if (os.getValorTotal() > 0) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Lembre-se de registrar manualmente a conta a receber no módulo Financeiro!\n" +
+                        "Valor: R$ " + String.format("%.2f", os.getValorTotal()),
+                        "Conta a Receber não Gerada", JOptionPane.INFORMATION_MESSAGE);
+                }
+                
+                carregarOrdensInstalacao();
+                limparCamposInstalacao();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao concluir instalação!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private class ProdutoSelecionado {
+        private ProdutoEstoque produto;
+        private int quantidade;
+        
+        public ProdutoSelecionado(ProdutoEstoque produto, int quantidade) {
+            this.produto = produto;
+            this.quantidade = quantidade;
+        }
+        
+        public ProdutoEstoque getProduto() { return produto; }
+        public int getQuantidade() { return quantidade; }
+    }
+}

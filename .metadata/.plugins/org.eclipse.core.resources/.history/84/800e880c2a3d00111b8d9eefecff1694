@@ -1,0 +1,252 @@
+// TelaOrcamento.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.ClienteDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaOrcamento extends JPanel {
+    private ClienteDAO clienteDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOrcamentos;
+    private DefaultTableModel modelOrcamentos;
+    private JComboBox<String> comboClienteOrcamento, comboStatusOrcamento;
+    private JTextArea txtDescricaoOrcamento;
+    private JTextField txtValorOrcamento;
+    private JButton btnSalvarOrcamento, btnAtualizarOrcamentos, btnFiltrar, btnLimpar;
+    
+    // Dados simulados (em produção, teria uma classe Orcamento)
+    private List<Map<String, Object>> orcamentos;
+    
+    public TelaOrcamento(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.clienteDAO = new ClienteDAO();
+        this.orcamentos = new ArrayList<>();
+        
+        initComponents();
+        carregarOrcamentos();
+        carregarClientesCombo();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Painel de filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        painelFiltros.add(new JLabel("Status:"));
+        comboStatusOrcamento = new JComboBox<>(new String[]{"TODOS", "PENDENTE", "APROVADO", "REJEITADO"});
+        
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboClienteOrcamento = new JComboBox<>();
+        comboClienteOrcamento.setPreferredSize(new Dimension(250, 25));
+        
+        btnFiltrar = new JButton("Filtrar");
+        btnLimpar = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarOrcamentos());
+        btnLimpar.addActionListener(e -> {
+            comboStatusOrcamento.setSelectedIndex(0);
+            comboClienteOrcamento.setSelectedIndex(0);
+            carregarOrcamentos();
+        });
+        
+        painelFiltros.add(comboStatusOrcamento);
+        painelFiltros.add(comboClienteOrcamento);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        // Tabela de Orçamentos
+        String[] colunas = {"ID", "Cliente", "Descrição", "Valor (R$)", "Status", "Data"};
+        modelOrcamentos = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOrcamentos = new JTable(modelOrcamentos);
+        tabelaOrcamentos.setRowHeight(25);
+        JScrollPane scrollTabela = new JScrollPane(tabelaOrcamentos);
+        
+        // Painel de registro
+        JPanel painelRegistro = new JPanel(new BorderLayout());
+        painelRegistro.setBorder(BorderFactory.createTitledBorder("Novo Orçamento"));
+        
+        JPanel painelCampos = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        painelCampos.add(new JLabel("Cliente:*"), gbc);
+        JComboBox<String> comboCliente = new JComboBox<>();
+        comboCliente.setPreferredSize(new Dimension(250, 25));
+        carregarClientesCombo(comboCliente);
+        gbc.gridx = 1;
+        painelCampos.add(comboCliente, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        painelCampos.add(new JLabel("Descrição:*"), gbc);
+        txtDescricaoOrcamento = new JTextArea(3, 30);
+        txtDescricaoOrcamento.setLineWrap(true);
+        JScrollPane scrollDesc = new JScrollPane(txtDescricaoOrcamento);
+        gbc.gridx = 1;
+        painelCampos.add(scrollDesc, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        painelCampos.add(new JLabel("Valor (R$):*"), gbc);
+        txtValorOrcamento = new JTextField(15);
+        gbc.gridx = 1;
+        painelCampos.add(txtValorOrcamento, gbc);
+        
+        btnSalvarOrcamento = new JButton("Salvar Orçamento");
+        btnSalvarOrcamento.setBackground(new Color(60, 120, 60));
+        btnSalvarOrcamento.setForeground(Color.WHITE);
+        btnSalvarOrcamento.setFont(new Font("Arial", Font.BOLD, 12));
+        btnSalvarOrcamento.addActionListener(e -> salvarOrcamento(comboCliente));
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        painelCampos.add(btnSalvarOrcamento, gbc);
+        
+        painelRegistro.add(painelCampos, BorderLayout.CENTER);
+        
+        // Botão atualizar na toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        btnAtualizarOrcamentos = new JButton("Atualizar");
+        btnAtualizarOrcamentos.addActionListener(e -> carregarOrcamentos());
+        toolBar.add(btnAtualizarOrcamentos);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        // Organizar layout
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelFiltros, BorderLayout.CENTER);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(scrollTabela, BorderLayout.CENTER);
+        add(painelRegistro, BorderLayout.SOUTH);
+    }
+    
+    private void carregarClientesCombo() {
+        carregarClientesCombo(comboClienteOrcamento);
+    }
+    
+    private void carregarClientesCombo(JComboBox<String> combo) {
+        combo.removeAllItems();
+        combo.addItem("TODOS");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            combo.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private void carregarOrcamentos() {
+        modelOrcamentos.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        // Dados simulados
+        for (Map<String, Object> o : orcamentos) {
+            Object[] row = {
+                o.get("id"),
+                o.get("cliente"),
+                o.get("descricao"),
+                String.format("%.2f", o.get("valor")),
+                o.get("status"),
+                sdf.format((Date) o.get("data"))
+            };
+            modelOrcamentos.addRow(row);
+        }
+    }
+    
+    private void filtrarOrcamentos() {
+        String status = (String) comboStatusOrcamento.getSelectedItem();
+        String clienteSelecionado = (String) comboClienteOrcamento.getSelectedItem();
+        
+        modelOrcamentos.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (Map<String, Object> o : orcamentos) {
+            if (!"TODOS".equals(status) && !status.equals(o.get("status"))) continue;
+            if (clienteSelecionado != null && !"TODOS".equals(clienteSelecionado)) {
+                String clienteNome = (String) o.get("cliente");
+                if (!clienteNome.contains(clienteSelecionado.split(" - ")[1])) continue;
+            }
+            
+            Object[] row = {
+                o.get("id"),
+                o.get("cliente"),
+                o.get("descricao"),
+                String.format("%.2f", o.get("valor")),
+                o.get("status"),
+                sdf.format((Date) o.get("data"))
+            };
+            modelOrcamentos.addRow(row);
+        }
+    }
+    
+    private void salvarOrcamento(JComboBox<String> comboCliente) {
+        if (comboCliente.getSelectedIndex() == -1 || "TODOS".equals(comboCliente.getSelectedItem())) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return;
+        }
+        
+        String descricao = txtDescricaoOrcamento.getText().trim();
+        if (descricao.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Descrição é obrigatória!");
+            return;
+        }
+        
+        String valorStr = txtValorOrcamento.getText().trim();
+        if (valorStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Valor é obrigatório!");
+            return;
+        }
+        
+        try {
+            double valor = Double.parseDouble(valorStr.replace(",", "."));
+            if (valor <= 0) {
+                JOptionPane.showMessageDialog(this, "Valor deve ser maior que zero!");
+                return;
+            }
+            
+            Map<String, Object> novoOrcamento = new HashMap<>();
+            novoOrcamento.put("id", orcamentos.size() + 1);
+            novoOrcamento.put("cliente", comboCliente.getSelectedItem());
+            novoOrcamento.put("descricao", descricao);
+            novoOrcamento.put("valor", valor);
+            novoOrcamento.put("status", "PENDENTE");
+            novoOrcamento.put("data", new Date());
+            
+            orcamentos.add(novoOrcamento);
+            
+            JOptionPane.showMessageDialog(this, 
+                "Orçamento salvo com sucesso!\n\n" +
+                "Cliente: " + comboCliente.getSelectedItem() + "\n" +
+                "Descrição: " + descricao + "\n" +
+                "Valor: R$ " + String.format("%.2f", valor),
+                "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            
+            txtDescricaoOrcamento.setText("");
+            txtValorOrcamento.setText("");
+            carregarOrcamentos();
+            
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Valor inválido! Use formato: 1234.56", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}

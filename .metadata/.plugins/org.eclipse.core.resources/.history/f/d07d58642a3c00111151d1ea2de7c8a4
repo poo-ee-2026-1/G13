@@ -1,0 +1,194 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.Equipamento;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class EquipamentoDAO {
+    
+    public boolean inserir(Equipamento equipamento) {
+        String sql = "INSERT INTO equipamentos (marca, modelo, tensao_nominal, id_cliente) VALUES (?, ?, ?, ?)";
+        
+        // Validar tensão nominal
+        if (equipamento.getTensaoNominal() < 1 || equipamento.getTensaoNominal() > 1500) {
+            System.err.println("Tensão nominal fora do intervalo permitido (1-1500V)");
+            return false;
+        }
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setString(1, equipamento.getMarca());
+            stmt.setString(2, equipamento.getModelo());
+            stmt.setDouble(3, equipamento.getTensaoNominal());
+            stmt.setInt(4, equipamento.getIdCliente());
+            
+            int affectedRows = stmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        equipamento.setId(rs.getInt(1));
+                    }
+                }
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean atualizar(Equipamento equipamento) {
+        String sql = "UPDATE equipamentos SET marca = ?, modelo = ?, tensao_nominal = ?, id_cliente = ? WHERE id = ?";
+        
+        if (equipamento.getTensaoNominal() < 1 || equipamento.getTensaoNominal() > 1500) {
+            System.err.println("Tensão nominal fora do intervalo permitido (1-1500V)");
+            return false;
+        }
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, equipamento.getMarca());
+            stmt.setString(2, equipamento.getModelo());
+            stmt.setDouble(3, equipamento.getTensaoNominal());
+            stmt.setInt(4, equipamento.getIdCliente());
+            stmt.setInt(5, equipamento.getId());
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluir(int id) {
+        String sql = "DELETE FROM equipamentos WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluirPorCliente(int idCliente) {
+        String sql = "DELETE FROM equipamentos WHERE id_cliente = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public Equipamento buscarPorId(int id) {
+        String sql = "SELECT * FROM equipamentos WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearEquipamento(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public List<Equipamento> buscarPorCliente(int idCliente) {
+        List<Equipamento> equipamentos = new ArrayList<>();
+        String sql = "SELECT * FROM equipamentos WHERE id_cliente = ? ORDER BY id";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    equipamentos.add(mapearEquipamento(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return equipamentos;
+    }
+    
+    public List<Equipamento> listarTodos() {
+        List<Equipamento> equipamentos = new ArrayList<>();
+        String sql = "SELECT * FROM equipamentos ORDER BY id";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                equipamentos.add(mapearEquipamento(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return equipamentos;
+    }
+    
+    public List<Equipamento> buscarPorMarca(String marca) {
+        List<Equipamento> equipamentos = new ArrayList<>();
+        String sql = "SELECT * FROM equipamentos WHERE marca LIKE ? ORDER BY id";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, "%" + marca + "%");
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    equipamentos.add(mapearEquipamento(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return equipamentos;
+    }
+    
+    public boolean verificarEquipamentoCliente(int idCliente) {
+        String sql = "SELECT COUNT(*) FROM equipamentos WHERE id_cliente = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, idCliente);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    private Equipamento mapearEquipamento(ResultSet rs) throws SQLException {
+        Equipamento equipamento = new Equipamento();
+        equipamento.setId(rs.getInt("id"));
+        equipamento.setMarca(rs.getString("marca"));
+        equipamento.setModelo(rs.getString("modelo"));
+        equipamento.setTensaoNominal(rs.getDouble("tensao_nominal"));
+        equipamento.setIdCliente(rs.getInt("id_cliente"));
+        return equipamento;
+    }
+}

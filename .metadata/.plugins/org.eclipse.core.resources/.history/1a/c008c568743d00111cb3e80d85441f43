@@ -1,0 +1,245 @@
+// DatabaseConnection.java
+package com.monitoramento.util;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import java.util.*;
+
+public class DatabaseConnection {
+    private static final String DATA_DIR = "data";
+    private static ObjectMapper objectMapper;
+    
+    static {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        // A configuração abaixo é para serialização, não deserialização
+        // objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        
+        File dataDir = new File(DATA_DIR);
+        if (!dataDir.exists()) {
+            dataDir.mkdirs();
+            System.out.println("Diretório de dados criado: " + DATA_DIR);
+        }
+    }
+    
+    public static <T> List<T> carregarLista(String fileName, Class<T> clazz) {
+        File file = new File(DATA_DIR, fileName);
+        if (!file.exists()) {
+            return new ArrayList<>();
+        }
+        
+        // Verificar se o arquivo está vazio
+        if (file.length() == 0) {
+            System.out.println("Arquivo " + fileName + " está vazio, retornando lista vazia");
+            return new ArrayList<>();
+        }
+        
+        try {
+            return objectMapper.readValue(file, objectMapper.getTypeFactory().constructCollectionType(List.class, clazz));
+        } catch (MismatchedInputException e) {
+            // Arquivo vazio ou com formato inválido
+            System.err.println("Arquivo " + fileName + " está corrompido ou vazio. Criando novo arquivo.");
+            // Criar arquivo vazio válido
+            salvarLista(fileName, new ArrayList<>());
+            return new ArrayList<>();
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar " + fileName + ": " + e.getMessage());
+            // Tentar criar um arquivo novo
+            try {
+                objectMapper.writeValue(file, new ArrayList<>());
+                System.out.println("Arquivo " + fileName + " recriado com sucesso!");
+            } catch (IOException ex) {
+                System.err.println("Erro ao recriar arquivo " + fileName + ": " + ex.getMessage());
+            }
+            return new ArrayList<>();
+        }
+    }
+    
+    public static <T> void salvarLista(String fileName, List<T> lista) {
+        File file = new File(DATA_DIR, fileName);
+        try {
+            if (lista == null) {
+                objectMapper.writeValue(file, new ArrayList<>());
+            } else {
+                objectMapper.writeValue(file, lista);
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar " + fileName + ": " + e.getMessage());
+        }
+    }
+    
+    public static <T> T carregarObjeto(String fileName, Class<T> clazz) {
+        File file = new File(DATA_DIR, fileName);
+        if (!file.exists()) {
+            try {
+                return clazz.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        
+        // Verificar se o arquivo está vazio
+        if (file.length() == 0) {
+            System.out.println("Arquivo " + fileName + " está vazio, criando objeto padrão");
+            try {
+                return clazz.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        
+        try {
+            return objectMapper.readValue(file, clazz);
+        } catch (MismatchedInputException e) {
+            System.err.println("Arquivo " + fileName + " está corrompido. Criando objeto padrão.");
+            try {
+                return clazz.getDeclaredConstructor().newInstance();
+            } catch (Exception ex) {
+                return null;
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar " + fileName + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    public static <T> void salvarObjeto(String fileName, T objeto) {
+        File file = new File(DATA_DIR, fileName);
+        try {
+            objectMapper.writeValue(file, objeto);
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar " + fileName + ": " + e.getMessage());
+        }
+    }
+    
+    public static int gerarNovoId(List<?> lista) {
+        if (lista == null || lista.isEmpty()) {
+            return 1;
+        }
+        
+        int maxId = 0;
+        for (Object obj : lista) {
+            try {
+                // Tentativa via reflection para obter o ID
+                Method getId = obj.getClass().getMethod("getId");
+                int id = (int) getId.invoke(obj);
+                if (id > maxId) {
+                    maxId = id;
+                }
+            } catch (NoSuchMethodException e) {
+                // Se não tiver método getId, tenta acessar campo diretamente
+                try {
+                    Field field = obj.getClass().getDeclaredField("id");
+                    field.setAccessible(true);
+                    int id = field.getInt(obj);
+                    if (id > maxId) {
+                        maxId = id;
+                    }
+                } catch (Exception ex) {
+                    // Ignorar, mantém o maxId atual
+                }
+            } catch (Exception e) {
+                // Ignorar
+            }
+        }
+        return maxId + 1;
+    }
+    
+    public static void inicializarArquivos() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json",
+                             "funcoes.json", "atendimentos.json", "transacoes_financeiras.json",
+                             "produtos_estoque.json", "movimentacoes_estoque.json", "instalacao_produtos.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (!file.exists() || file.length() == 0) {
+                try {
+                    objectMapper.writeValue(file, new ArrayList<>());
+                    System.out.println("Arquivo criado/recriado: " + arquivo);
+                } catch (IOException e) {
+                    System.err.println("Erro ao criar arquivo " + arquivo + ": " + e.getMessage());
+                }
+            }
+        }
+        
+        System.out.println("Sistema de arquivos JSON inicializado com sucesso!");
+        System.out.println("Diretório de dados: " + new File(DATA_DIR).getAbsolutePath());
+    }
+    
+    public static void recriarArquivo(String fileName) {
+        File file = new File(DATA_DIR, fileName);
+        try {
+            if (file.exists()) {
+                file.delete();
+            }
+            objectMapper.writeValue(file, new ArrayList<>());
+            System.out.println("Arquivo " + fileName + " recriado com sucesso!");
+        } catch (IOException e) {
+            System.err.println("Erro ao recriar arquivo " + fileName + ": " + e.getMessage());
+        }
+    }
+    
+    public static String getDataDirectoryPath() {
+        return new File(DATA_DIR).getAbsolutePath();
+    }
+    
+    public static boolean verificarArquivosExistentes() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json",
+                             "funcoes.json", "atendimentos.json", "transacoes_financeiras.json",
+                             "produtos_estoque.json", "movimentacoes_estoque.json", "instalacao_produtos.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (!file.exists() || file.length() == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    public static void limparTodosDados() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json",
+                             "funcoes.json", "atendimentos.json", "transacoes_financeiras.json",
+                             "produtos_estoque.json", "movimentacoes_estoque.json", "instalacao_produtos.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (file.exists()) {
+                file.delete();
+                System.out.println("Arquivo removido: " + arquivo);
+            }
+        }
+        
+        inicializarArquivos();
+    }
+    
+    public static void testConnection() {
+        inicializarArquivos();
+        System.out.println("Sistema operacional: " + System.getProperty("os.name"));
+        System.out.println("Diretório de trabalho: " + System.getProperty("user.dir"));
+        System.out.println("Armazenamento JSON funcionando corretamente!");
+    }
+    
+    public static void closeConnection() {
+        System.out.println("Sistema encerrado - dados salvos em arquivos JSON");
+        System.out.println("Diretório de dados: " + getDataDirectoryPath());
+    }
+    
+    public static Object getConnection() {
+        System.out.println("Usando armazenamento JSON em vez de banco de dados MySQL");
+        return null;
+    }
+}

@@ -1,0 +1,22 @@
+[ {
+  "id" : 1,
+  "tipo" : "FISICA",
+  "documento" : "01715709101",
+  "nome" : "Elberty",
+  "sobrenome" : "Borges de Oliveira",
+  "razaoSocial" : "",
+  "nomeFantasia" : "",
+  "logradouro" : "Rua 68",
+  "numero" : "118",
+  "bairro" : "Setor Central",
+  "cidade" : "Goiânia",
+  "estado" : "Goiás",
+  "cep" : "74055100",
+  "telefoneDDD" : "62",
+  "telefoneNumero" : "991185365",
+  "ipCliente" : "192.168.100.105",
+  "emMonitoramento" : true,
+  "dataCadastro" : null,
+  "nomeExibicao" : "Elberty Borges de Oliveira (ID: 1)",
+  "telefoneCompleto" : "(62) 991185365"
+} ]

@@ -1,0 +1,168 @@
+package com.monitoramento.util;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.*;
+
+public class DatabaseConnection {
+    private static final String DATA_DIR = "data";
+    private static ObjectMapper objectMapper;
+    
+    static {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        
+        File dataDir = new File(DATA_DIR);
+        if (!dataDir.exists()) {
+            dataDir.mkdirs();
+            System.out.println("Diretório de dados criado: " + DATA_DIR);
+        }
+    }
+    
+    public static <T> List<T> carregarLista(String fileName, Class<T> clazz) {
+        File file = new File(DATA_DIR, fileName);
+        if (!file.exists()) {
+            return new ArrayList<>();
+        }
+        
+        try {
+            return objectMapper.readValue(file, objectMapper.getTypeFactory().constructCollectionType(List.class, clazz));
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar " + fileName + ": " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
+    public static <T> void salvarLista(String fileName, List<T> lista) {
+        File file = new File(DATA_DIR, fileName);
+        try {
+            objectMapper.writeValue(file, lista);
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar " + fileName + ": " + e.getMessage());
+        }
+    }
+    
+    public static <T> T carregarObjeto(String fileName, Class<T> clazz) {
+        File file = new File(DATA_DIR, fileName);
+        if (!file.exists()) {
+            try {
+                return clazz.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        
+        try {
+            return objectMapper.readValue(file, clazz);
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar " + fileName + ": " + e.getMessage());
+            return null;
+        }
+    }
+    
+    public static <T> void salvarObjeto(String fileName, T objeto) {
+        File file = new File(DATA_DIR, fileName);
+        try {
+            objectMapper.writeValue(file, objeto);
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar " + fileName + ": " + e.getMessage());
+        }
+    }
+    
+    public static int gerarNovoId(List<?> lista) {
+        if (lista == null || lista.isEmpty()) {
+            return 1;
+        }
+        
+        int maxId = 0;
+        for (Object obj : lista) {
+            try {
+                Method getId = obj.getClass().getMethod("getId");
+                int id = (int) getId.invoke(obj);
+                if (id > maxId) {
+                    maxId = id;
+                }
+            } catch (Exception e) {
+                // Se não conseguir ler ID, continua
+            }
+        }
+        return maxId + 1;
+    }
+    
+    public static void inicializarArquivos() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (!file.exists()) {
+                try {
+                    objectMapper.writeValue(file, new ArrayList<>());
+                    System.out.println("Arquivo criado: " + arquivo);
+                } catch (IOException e) {
+                    System.err.println("Erro ao criar arquivo " + arquivo + ": " + e.getMessage());
+                }
+            }
+        }
+        
+        System.out.println("Sistema de arquivos JSON inicializado com sucesso!");
+        System.out.println("Diretório de dados: " + new File(DATA_DIR).getAbsolutePath());
+    }
+    
+    public static String getDataDirectoryPath() {
+        return new File(DATA_DIR).getAbsolutePath();
+    }
+    
+    public static boolean verificarArquivosExistentes() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (!file.exists()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    public static void limparTodosDados() {
+        String[] arquivos = {"clientes.json", "equipamentos.json", "usuarios.json", 
+                             "departamentos.json", "medicoes.json", "ordens_servico.json"};
+        
+        for (String arquivo : arquivos) {
+            File file = new File(DATA_DIR, arquivo);
+            if (file.exists()) {
+                file.delete();
+                System.out.println("Arquivo removido: " + arquivo);
+            }
+        }
+        
+        inicializarArquivos();
+    }
+    
+    public static void testConnection() {
+        inicializarArquivos();
+        System.out.println("Sistema operacional: " + System.getProperty("os.name"));
+        System.out.println("Diretório de trabalho: " + System.getProperty("user.dir"));
+        System.out.println("Armazenamento JSON funcionando corretamente!");
+    }
+    
+    public static void closeConnection() {
+        System.out.println("Sistema encerrado - dados salvos em arquivos JSON");
+        System.out.println("Diretório de dados: " + getDataDirectoryPath());
+    }
+    
+    public static Object getConnection() {
+        System.out.println("Usando armazenamento JSON em vez de banco de dados MySQL");
+        return null;
+    }
+}

@@ -1,0 +1,192 @@
+package com.monitoramento.service;
+
+import java.net.InetSocketAddress;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.model.Cliente;
+
+// Implementação manual de JSON para evitar dependência externa
+class SimpleJsonObject {
+    private Map<String, Object> properties = new HashMap<>();
+    
+    public void addProperty(String key, String value) {
+        if (value == null) {
+            properties.put(key, "null");
+        } else {
+            properties.put(key, "\"" + escapeJson(value) + "\"");
+        }
+    }
+    
+    public void addProperty(String key, Number value) {
+        properties.put(key, value);
+    }
+    
+    public void addProperty(String key, boolean value) {
+        properties.put(key, value);
+    }
+    
+    private String escapeJson(String s) {
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        int i = 0;
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(escapeJson(entry.getKey())).append("\":").append(entry.getValue());
+            i++;
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+}
+
+// Import opcional para WebSocket - verificar se a biblioteca está disponível
+public class WebSocketServer {
+    private MonitoramentoService monitoramentoService;
+    private ClienteDAO clienteDAO;
+    private Map<Object, Integer> conexoesClientes;
+    private Map<String, Integer> ipClienteMap;
+    private Object webSocketServerImpl;
+    private boolean running = false;
+    
+    private static final int PORTA_PADRAO = 8080;
+    
+    public WebSocketServer(MonitoramentoService monitoramentoService) {
+        this.monitoramentoService = monitoramentoService;
+        this.clienteDAO = new ClienteDAO();
+        this.conexoesClientes = new ConcurrentHashMap<>();
+        this.ipClienteMap = new ConcurrentHashMap<>();
+        
+        mapearIPsClientes();
+        
+        // Tentar inicializar o servidor WebSocket real se a biblioteca estiver disponível
+        inicializarWebSocketReal();
+    }
+    
+    private void inicializarWebSocketReal() {
+        try {
+            // Verificar se a classe WebSocketServer existe
+            Class.forName("org.java_websocket.server.WebSocketServer");
+            // Se chegou aqui, a biblioteca está disponível
+            System.out.println("Biblioteca Java-WebSocket encontrada. Inicializando servidor real...");
+        } catch (ClassNotFoundException e) {
+            System.err.println("Biblioteca Java-WebSocket não encontrada. WebSocket Server será simulado.");
+            System.err.println("Para funcionamento real, adicione a dependência: org.java_websocket:Java-WebSocket:1.5.2");
+        }
+    }
+    
+    private void mapearIPsClientes() {
+        ipClienteMap.clear();
+        List<Cliente> clientes = clienteDAO.listarPorMonitoramento(true);
+        for (Cliente cliente : clientes) {
+            if (cliente.getIpCliente() != null && !cliente.getIpCliente().isEmpty()) {
+                ipClienteMap.put(cliente.getIpCliente(), cliente.getId());
+            }
+        }
+        System.out.println("Mapeados " + ipClienteMap.size() + " clientes por IP");
+    }
+    
+    public void start() {
+        running = true;
+        System.out.println("WebSocket Server iniciado (modo simulado) na porta " + PORTA_PADRAO);
+        System.out.println("Aguardando conexões dos ESP32...");
+        System.out.println("Nota: Para conexões reais, adicione a biblioteca Java-WebSocket ao projeto.");
+        
+        // Em modo real, aqui iniciaria o servidor real
+        // Por enquanto, apenas simulamos
+        iniciarSimulador();
+    }
+    
+    private void iniciarSimulador() {
+        // Thread para simular recebimento de dados (apenas para teste)
+        Thread simulador = new Thread(() -> {
+            System.out.println("Modo simulado ativo. Para testar, use um cliente WebSocket real na porta 8080.");
+            while (running) {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        });
+        simulador.setDaemon(true);
+        simulador.start();
+    }
+    
+    public void stop(int timeout) throws InterruptedException {
+        running = false;
+        System.out.println("WebSocket Server parado");
+    }
+    
+    public void stop() throws InterruptedException {
+        running = false;
+        System.out.println("WebSocket Server parado");
+    }
+    
+    public boolean isStopped() {
+        return !running;
+    }
+    
+    public void pararServidor() {
+        try {
+            System.out.println("Parando servidor WebSocket...");
+            running = false;
+            stop(5000);
+            System.out.println("Servidor WebSocket parado com sucesso!");
+        } catch (InterruptedException e) {
+            System.err.println("Erro ao parar servidor WebSocket: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    public void pararServidorForcado() {
+        pararServidor();
+    }
+    
+    public boolean isExecutando() {
+        return running;
+    }
+    
+    public void atualizarMapeamentoIPs() {
+        mapearIPsClientes();
+    }
+    
+    // Método para processar medição recebida (pode ser chamado por implementação real)
+    public void processarMedicaoRecebida(String ipCliente, double tensao, long timestamp) {
+        Integer idCliente = ipClienteMap.get(ipCliente);
+        if (idCliente == null) {
+            System.err.println("IP não cadastrado: " + ipCliente);
+            return;
+        }
+        
+        if (tensao < 0 || tensao > 25) {
+            System.err.println("Tensão inválida recebida do cliente " + idCliente + ": " + tensao);
+            return;
+        }
+        
+        Date dataHora = new Date(timestamp);
+        Cliente cliente = clienteDAO.buscarPorId(idCliente);
+        if (cliente == null || !cliente.isEmMonitoramento()) {
+            System.err.println("Cliente " + idCliente + " não está em monitoramento");
+            return;
+        }
+        
+        if (monitoramentoService != null) {
+            monitoramentoService.receberMedicao(idCliente, tensao);
+            System.out.println("Medição processada - Cliente: " + idCliente + 
+                               ", Tensão: " + tensao + "V, Data: " + dataHora);
+        }
+    }
+}

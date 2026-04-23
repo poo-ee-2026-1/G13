@@ -1,0 +1,97 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.Usuario;
+import com.monitoramento.util.DatabaseConnection;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class UsuarioDAO {
+    
+    public boolean inserir(Usuario usuario) {
+        String sql = "INSERT INTO usuarios (nome, sobrenome, cpf, matricula, funcao, login, senha) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, usuario.getNome());
+            stmt.setString(2, usuario.getSobrenome());
+            stmt.setString(3, usuario.getCpf());
+            stmt.setString(4, usuario.getMatricula());
+            stmt.setString(5, usuario.getFuncao());
+            stmt.setString(6, usuario.getLogin());
+            stmt.setString(7, usuario.getSenha());
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluir(int id) {
+        String sql = "DELETE FROM usuarios WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public List<Usuario> listarTodos() {
+        List<Usuario> usuarios = new ArrayList<>();
+        String sql = "SELECT * FROM usuarios ORDER BY nome";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                Usuario u = new Usuario();
+                u.setId(rs.getInt("id"));
+                u.setNome(rs.getString("nome"));
+                u.setSobrenome(rs.getString("sobrenome"));
+                u.setCpf(rs.getString("cpf"));
+                u.setMatricula(rs.getString("matricula"));
+                u.setFuncao(rs.getString("funcao"));
+                u.setLogin(rs.getString("login"));
+                u.setSenha(rs.getString("senha"));
+                usuarios.add(u);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return usuarios;
+    }
+    
+    public Usuario autenticar(String login, String senha) {
+        String sql = "SELECT * FROM usuarios WHERE login = ? AND senha = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, login);
+            stmt.setString(2, senha);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Usuario u = new Usuario();
+                    u.setId(rs.getInt("id"));
+                    u.setNome(rs.getString("nome"));
+                    u.setSobrenome(rs.getString("sobrenome"));
+                    u.setCpf(rs.getString("cpf"));
+                    u.setMatricula(rs.getString("matricula"));
+                    u.setFuncao(rs.getString("funcao"));
+                    u.setLogin(rs.getString("login"));
+                    u.setSenha(rs.getString("senha"));
+                    return u;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}

@@ -1,0 +1,30 @@
+[ {
+  "cliente" : "1 - Elberty Borges de Oliveira (ID: 1)",
+  "data" : "2026-04-22T21:05:28.768+00:00",
+  "produtos" : [ {
+    "precoUnitario" : 10.0,
+    "idProduto" : 1,
+    "subtotal" : 10.0,
+    "nome" : "Produto de Teste",
+    "quantidade" : 1
+  } ],
+  "valor" : 10.0,
+  "id" : 1,
+  "descricao" : "Teste",
+  "status" : "APROVADO"
+}, {
+  "cliente" : "1 - Elberty Borges de Oliveira (ID: 1)",
+  "data" : "2026-04-22T21:06:22.194+00:00",
+  "produtos" : [ {
+    "precoUnitario" : 10.0,
+    "idProduto" : 1,
+    "subtotal" : 10.0,
+    "nome" : "Produto de Teste",
+    "quantidade" : 1
+  } ],
+  "valor" : 10.0,
+  "id" : 2,
+  "descricao" : "Teste",
+  "status" : "REJEITADO",
+  "motivoRejeicao" : "Teste"
+} ]

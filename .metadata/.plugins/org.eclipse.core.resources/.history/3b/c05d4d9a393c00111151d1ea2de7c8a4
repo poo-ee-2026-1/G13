@@ -1,0 +1,47 @@
+package com.monitoramento.util;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    private static final String URL = "jdbc:mysql://localhost:3306/monitoramento_tensao?useSSL=false&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASSWORD = "";
+    
+    private static Connection connection = null;
+    
+    public static Connection getConnection() {
+        if (connection == null) {
+            try {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+                connection = DriverManager.getConnection(URL, USER, PASSWORD);
+                System.out.println("Conexão com banco de dados estabelecida!");
+            } catch (ClassNotFoundException | SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException("Erro ao conectar ao banco de dados", e);
+            }
+        }
+        return connection;
+    }
+    
+    public static void closeConnection() {
+        if (connection != null) {
+            try {
+                connection.close();
+                connection = null;
+                System.out.println("Conexão com banco de dados fechada!");
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
+    public static void testConnection() {
+        try (Connection conn = getConnection()) {
+            System.out.println("Teste de conexão realizado com sucesso!");
+        } catch (SQLException e) {
+            System.err.println("Falha no teste de conexão: " + e.getMessage());
+        }
+    }
+}

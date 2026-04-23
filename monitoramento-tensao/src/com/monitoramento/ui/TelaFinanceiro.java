@@ -1,0 +1,640 @@
+// TelaFinanceiro.java (Convertido para JPanel)
+package com.monitoramento.ui;
+
+import com.monitoramento.model.TransacaoFinanceira;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.TransacaoFinanceiraDAO;
+import com.monitoramento.dao.ClienteDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaFinanceiro extends JPanel {
+    private TransacaoFinanceiraDAO transacaoDAO;
+    private ClienteDAO clienteDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaTransacoes;
+    private DefaultTableModel tableModel;
+    private JLabel lblSaldo, lblTotalEntradas, lblTotalSaidas;
+    private JTabbedPane tabbedPane;
+    
+    // Componentes para nova transação
+    private JComboBox<String> comboTipo, comboNatureza, comboFormaPagamento, comboStatus, comboCliente;
+    private JTextField txtValor, txtDescricao, txtDocumentoRef;
+    private JSpinner spDataVencimento;
+    
+    public TelaFinanceiro(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.transacaoDAO = new TransacaoFinanceiraDAO();
+        this.clienteDAO = new ClienteDAO();
+        
+        initComponents();
+        carregarClientesCombo();
+        carregarTransacoes();
+        atualizarResumo();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        tabbedPane = new JTabbedPane();
+        
+        // Aba de Transações
+        tabbedPane.addTab("Transações", criarPainelTransacoes());
+        
+        // Aba de Contas a Pagar
+        tabbedPane.addTab("Contas à Pagar", criarPainelContasPagar());
+        
+        // Aba de Contas a Receber
+        tabbedPane.addTab("Contas à Receber", criarPainelContasReceber());
+        
+        // Aba de Resumo Financeiro
+        tabbedPane.addTab("Resumo Financeiro", criarPainelResumo());
+        
+        // Aba de Nova Transação
+        tabbedPane.addTab("Nova Transação", criarPainelNovaTransacao());
+        
+        add(tabbedPane, BorderLayout.CENTER);
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnAtualizar = new JButton("Atualizar");
+        btnAtualizar.addActionListener(e -> {
+            carregarTransacoes();
+            atualizarResumo();
+        });
+        
+        toolBar.add(btnAtualizar);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        add(toolBar, BorderLayout.NORTH);
+    }
+    
+    private JPanel criarPainelTransacoes() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        JComboBox<String> comboTipoFiltro = new JComboBox<>(new String[]{"TODAS", "ENTRADA", "SAIDA"});
+        JComboBox<String> comboStatusFiltro = new JComboBox<>(new String[]{"TODOS", "PENDENTE", "PAGO", "RECEBIDO", "CANCELADO"});
+        JButton btnFiltrar = new JButton("Filtrar");
+        JButton btnLimpar = new JButton("Limpar");
+        
+        painelFiltros.add(new JLabel("Tipo:"));
+        painelFiltros.add(comboTipoFiltro);
+        painelFiltros.add(new JLabel("Status:"));
+        painelFiltros.add(comboStatusFiltro);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        // Tabela
+        String[] colunas = {"ID", "Data", "Tipo", "Natureza", "Valor (R$)", "Forma Pagamento", "Status", "Cliente", "Descrição"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaTransacoes = new JTable(tableModel);
+        tabelaTransacoes.setRowHeight(25);
+        JScrollPane scrollTabela = new JScrollPane(tabelaTransacoes);
+        
+        btnFiltrar.addActionListener(e -> {
+            String tipo = (String) comboTipoFiltro.getSelectedItem();
+            String status = (String) comboStatusFiltro.getSelectedItem();
+            
+            List<TransacaoFinanceira> transacoes = transacaoDAO.listarTodas();
+            
+            if (!"TODAS".equals(tipo)) {
+                transacoes = transacoes.stream()
+                    .filter(t -> t.getTipo().equals(tipo))
+                    .toList();
+            }
+            
+            if (!"TODOS".equals(status)) {
+                transacoes = transacoes.stream()
+                    .filter(t -> t.getStatus().equals(status))
+                    .toList();
+            }
+            
+            carregarTabelaTransacoes(transacoes);
+        });
+        
+        btnLimpar.addActionListener(e -> carregarTransacoes());
+        
+        // Painel de resumo rápido
+        JPanel painelResumoRapido = new JPanel(new GridLayout(1, 3, 10, 10));
+        painelResumoRapido.setBorder(BorderFactory.createTitledBorder("Resumo Rápido"));
+        
+        lblSaldo = new JLabel("Saldo: R$ 0,00", SwingConstants.CENTER);
+        lblTotalEntradas = new JLabel("Total Entradas: R$ 0,00", SwingConstants.CENTER);
+        lblTotalSaidas = new JLabel("Total Saídas: R$ 0,00", SwingConstants.CENTER);
+        
+        lblSaldo.setFont(new Font("Arial", Font.BOLD, 14));
+        lblTotalEntradas.setFont(new Font("Arial", Font.PLAIN, 12));
+        lblTotalSaidas.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        painelResumoRapido.add(lblSaldo);
+        painelResumoRapido.add(lblTotalEntradas);
+        painelResumoRapido.add(lblTotalSaidas);
+        
+        panel.add(painelFiltros, BorderLayout.NORTH);
+        panel.add(scrollTabela, BorderLayout.CENTER);
+        panel.add(painelResumoRapido, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelContasPagar() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        String[] colunas = {"ID", "Data Vencimento", "Descrição", "Valor (R$)", "Status", "Fornecedor/Destino"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tabela = new JTable(model);
+        
+        List<TransacaoFinanceira> contasPagar = transacaoDAO.listarContasPagar();
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (TransacaoFinanceira t : contasPagar) {
+            Object[] row = {
+                t.getId(),
+                t.getDataVencimento() != null ? sdf.format(t.getDataVencimento()) : "---",
+                t.getDescricao(),
+                String.format("R$ %.2f", t.getValor()),
+                t.getStatus(),
+                t.getDocumentoReferencia() != null ? t.getDocumentoReferencia() : "---"
+            };
+            model.addRow(row);
+        }
+        
+        JButton btnPagar = new JButton("Marcar como Pago");
+        btnPagar.addActionListener(e -> {
+            int row = tabela.getSelectedRow();
+            if (row >= 0) {
+                int id = (int) model.getValueAt(row, 0);
+                TransacaoFinanceira t = transacaoDAO.buscarPorId(id);
+                if (t != null && "PENDENTE".equals(t.getStatus())) {
+                    t.setStatus("PAGO");
+                    t.setDataPagamento(new Date());
+                    if (transacaoDAO.atualizar(t)) {
+                        JOptionPane.showMessageDialog(panel, "Conta marcada como paga!");
+                        model.setRowCount(0);
+                        List<TransacaoFinanceira> updated = transacaoDAO.listarContasPagar();
+                        for (TransacaoFinanceira tt : updated) {
+                            Object[] rowData = {
+                                tt.getId(),
+                                tt.getDataVencimento() != null ? sdf.format(tt.getDataVencimento()) : "---",
+                                tt.getDescricao(),
+                                String.format("R$ %.2f", tt.getValor()),
+                                tt.getStatus(),
+                                tt.getDocumentoReferencia() != null ? tt.getDocumentoReferencia() : "---"
+                            };
+                            model.addRow(rowData);
+                        }
+                        atualizarResumo();
+                        carregarTransacoes();
+                    }
+                }
+            } else {
+                JOptionPane.showMessageDialog(panel, "Selecione uma conta para pagar!");
+            }
+        });
+        
+        panel.add(new JScrollPane(tabela), BorderLayout.CENTER);
+        panel.add(btnPagar, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelContasReceber() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        String[] colunas = {"ID", "Data Vencimento", "Descrição", "Valor (R$)", "Status", "Cliente"};
+        DefaultTableModel model = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tabela = new JTable(model);
+        
+        List<TransacaoFinanceira> contasReceber = transacaoDAO.listarContasReceber();
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (TransacaoFinanceira t : contasReceber) {
+            Cliente c = t.getIdCliente() > 0 ? clienteDAO.buscarPorId(t.getIdCliente()) : null;
+            String nomeCliente = c != null ? c.getNomeExibicao() : "---";
+            
+            Object[] row = {
+                t.getId(),
+                t.getDataVencimento() != null ? sdf.format(t.getDataVencimento()) : "---",
+                t.getDescricao(),
+                String.format("R$ %.2f", t.getValor()),
+                t.getStatus(),
+                nomeCliente
+            };
+            model.addRow(row);
+        }
+        
+        JButton btnReceber = new JButton("Marcar como Recebido");
+        btnReceber.addActionListener(e -> {
+            int row = tabela.getSelectedRow();
+            if (row >= 0) {
+                int id = (int) model.getValueAt(row, 0);
+                TransacaoFinanceira t = transacaoDAO.buscarPorId(id);
+                if (t != null && "PENDENTE".equals(t.getStatus())) {
+                    t.setStatus("RECEBIDO");
+                    t.setDataPagamento(new Date());
+                    if (transacaoDAO.atualizar(t)) {
+                        JOptionPane.showMessageDialog(panel, "Conta marcada como recebida!");
+                        model.setRowCount(0);
+                        List<TransacaoFinanceira> updated = transacaoDAO.listarContasReceber();
+                        for (TransacaoFinanceira tt : updated) {
+                            Cliente c = tt.getIdCliente() > 0 ? clienteDAO.buscarPorId(tt.getIdCliente()) : null;
+                            String nomeCliente = c != null ? c.getNomeExibicao() : "---";
+                            Object[] rowData = {
+                                tt.getId(),
+                                tt.getDataVencimento() != null ? sdf.format(tt.getDataVencimento()) : "---",
+                                tt.getDescricao(),
+                                String.format("R$ %.2f", tt.getValor()),
+                                tt.getStatus(),
+                                nomeCliente
+                            };
+                            model.addRow(rowData);
+                        }
+                        atualizarResumo();
+                        carregarTransacoes();
+                    }
+                }
+            } else {
+                JOptionPane.showMessageDialog(panel, "Selecione uma conta para receber!");
+            }
+        });
+        
+        panel.add(new JScrollPane(tabela), BorderLayout.CENTER);
+        panel.add(btnReceber, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelResumo() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        JPanel painelSaldo = new JPanel();
+        painelSaldo.setBorder(BorderFactory.createTitledBorder("Saldo Atual"));
+        JLabel lblSaldoAtual = new JLabel();
+        lblSaldoAtual.setFont(new Font("Arial", Font.BOLD, 24));
+        painelSaldo.add(lblSaldoAtual);
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        panel.add(painelSaldo, gbc);
+        
+        JPanel painelComparacao = new JPanel(new GridLayout(1, 2, 20, 0));
+        painelComparacao.setBorder(BorderFactory.createTitledBorder("Total por Período"));
+        
+        JPanel painelEntradas = new JPanel();
+        painelEntradas.setBorder(BorderFactory.createTitledBorder("Entradas"));
+        JLabel lblTotalEntradasPeriodo = new JLabel();
+        lblTotalEntradasPeriodo.setFont(new Font("Arial", Font.BOLD, 18));
+        painelEntradas.add(lblTotalEntradasPeriodo);
+        
+        JPanel painelSaidas = new JPanel();
+        painelSaidas.setBorder(BorderFactory.createTitledBorder("Saídas"));
+        JLabel lblTotalSaidasPeriodo = new JLabel();
+        lblTotalSaidasPeriodo.setFont(new Font("Arial", Font.BOLD, 18));
+        painelSaidas.add(lblTotalSaidasPeriodo);
+        
+        painelComparacao.add(painelEntradas);
+        painelComparacao.add(painelSaidas);
+        
+        gbc.gridy = 1;
+        panel.add(painelComparacao, gbc);
+        
+        JPanel painelPeriodo = new JPanel(new FlowLayout());
+        painelPeriodo.setBorder(BorderFactory.createTitledBorder("Selecionar Período"));
+        
+        JSpinner spDataInicio = new JSpinner(new SpinnerDateModel());
+        JSpinner spDataFim = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor editorInicio = new JSpinner.DateEditor(spDataInicio, "dd/MM/yyyy");
+        JSpinner.DateEditor editorFim = new JSpinner.DateEditor(spDataFim, "dd/MM/yyyy");
+        spDataInicio.setEditor(editorInicio);
+        spDataFim.setEditor(editorFim);
+        
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_YEAR, -30);
+        spDataInicio.setValue(cal.getTime());
+        spDataFim.setValue(new Date());
+        
+        JButton btnCalcular = new JButton("Calcular");
+        
+        btnCalcular.addActionListener(e -> {
+            Date dataInicio = (Date) spDataInicio.getValue();
+            Date dataFim = (Date) spDataFim.getValue();
+            
+            Calendar calFim = Calendar.getInstance();
+            calFim.setTime(dataFim);
+            calFim.set(Calendar.HOUR_OF_DAY, 23);
+            calFim.set(Calendar.MINUTE, 59);
+            calFim.set(Calendar.SECOND, 59);
+            dataFim = calFim.getTime();
+            
+            Map<String, Double> resumo = transacaoDAO.getResumoPorNatureza(dataInicio, dataFim);
+            
+            double totalEntradas = 0;
+            double totalSaidas = 0;
+            
+            StringBuilder sbEntradas = new StringBuilder("<html>");
+            StringBuilder sbSaidas = new StringBuilder("<html>");
+            
+            for (Map.Entry<String, Double> entry : resumo.entrySet()) {
+                if (entry.getValue() > 0) {
+                    totalEntradas += entry.getValue();
+                    sbEntradas.append(entry.getKey()).append(": R$ ").append(String.format("%.2f", entry.getValue())).append("<br>");
+                } else if (entry.getValue() < 0) {
+                    totalSaidas += Math.abs(entry.getValue());
+                    sbSaidas.append(entry.getKey()).append(": R$ ").append(String.format("%.2f", Math.abs(entry.getValue()))).append("<br>");
+                }
+            }
+            
+            sbEntradas.append("</html>");
+            sbSaidas.append("</html>");
+            
+            lblTotalEntradasPeriodo.setText(String.format("R$ %.2f", totalEntradas));
+            lblTotalSaidasPeriodo.setText(String.format("R$ %.2f", totalSaidas));
+            
+            JTextArea txtDetalhes = new JTextArea(15, 40);
+            txtDetalhes.setText("=== DETALHES DO PERÍODO ===\n\n");
+            txtDetalhes.append("Período: " + new SimpleDateFormat("dd/MM/yyyy").format(dataInicio) + 
+                              " a " + new SimpleDateFormat("dd/MM/yyyy").format(dataFim) + "\n\n");
+            txtDetalhes.append("--- ENTRADAS ---\n");
+            for (Map.Entry<String, Double> entry : resumo.entrySet()) {
+                if (entry.getValue() > 0) {
+                    txtDetalhes.append(String.format("%s: R$ %.2f\n", entry.getKey(), entry.getValue()));
+                }
+            }
+            txtDetalhes.append("\n--- SAÍDAS ---\n");
+            for (Map.Entry<String, Double> entry : resumo.entrySet()) {
+                if (entry.getValue() < 0) {
+                    txtDetalhes.append(String.format("%s: R$ %.2f\n", entry.getKey(), Math.abs(entry.getValue())));
+                }
+            }
+            txtDetalhes.append("\n--- RESUMO ---\n");
+            txtDetalhes.append(String.format("Total Entradas: R$ %.2f\n", totalEntradas));
+            txtDetalhes.append(String.format("Total Saídas: R$ %.2f\n", totalSaidas));
+            txtDetalhes.append(String.format("Saldo do Período: R$ %.2f\n", totalEntradas - totalSaidas));
+            
+            JOptionPane.showMessageDialog(panel, new JScrollPane(txtDetalhes), 
+                "Detalhes do Período", JOptionPane.INFORMATION_MESSAGE);
+        });
+        
+        painelPeriodo.add(new JLabel("Data Início:"));
+        painelPeriodo.add(spDataInicio);
+        painelPeriodo.add(new JLabel("Data Fim:"));
+        painelPeriodo.add(spDataFim);
+        painelPeriodo.add(btnCalcular);
+        
+        gbc.gridy = 2;
+        panel.add(painelPeriodo, gbc);
+        
+        double saldo = transacaoDAO.calcularSaldo();
+        lblSaldoAtual.setText(String.format("R$ %.2f", saldo));
+        lblSaldoAtual.setForeground(saldo >= 0 ? new Color(0, 100, 0) : Color.RED);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelNovaTransacao() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Tipo:*"), gbc);
+        comboTipo = new JComboBox<>(new String[]{"ENTRADA", "SAIDA"});
+        gbc.gridx = 1;
+        panel.add(comboTipo, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Natureza:*"), gbc);
+        comboNatureza = new JComboBox<>(new String[]{
+            "Venda", "Instalação", "Mensalidade", "Manutenção", 
+            "Salário", "Aluguel", "Imposto", "Fornecedor", "Outro"
+        });
+        gbc.gridx = 1;
+        panel.add(comboNatureza, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Forma de Pagamento:*"), gbc);
+        comboFormaPagamento = new JComboBox<>(new String[]{
+            "DINHEIRO", "PIX", "CARTAO_DEBITO", "CARTAO_CREDITO", "TRANSFERENCIA", "BOLETO", "DUPLICATA"
+        });
+        gbc.gridx = 1;
+        panel.add(comboFormaPagamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(new JLabel("Valor (R$):*"), gbc);
+        txtValor = new JTextField(15);
+        gbc.gridx = 1;
+        panel.add(txtValor, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        panel.add(new JLabel("Descrição:*"), gbc);
+        txtDescricao = new JTextField(30);
+        gbc.gridx = 1;
+        panel.add(txtDescricao, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        panel.add(new JLabel("Status:*"), gbc);
+        comboStatus = new JComboBox<>(new String[]{"PENDENTE", "PAGO", "RECEBIDO", "CANCELADO"});
+        gbc.gridx = 1;
+        panel.add(comboStatus, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 6;
+        panel.add(new JLabel("Data Vencimento:"), gbc);
+        spDataVencimento = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spDataVencimento, "dd/MM/yyyy");
+        spDataVencimento.setEditor(editor);
+        gbc.gridx = 1;
+        panel.add(spDataVencimento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 7;
+        panel.add(new JLabel("Documento Referência:"), gbc);
+        txtDocumentoRef = new JTextField(20);
+        gbc.gridx = 1;
+        panel.add(txtDocumentoRef, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 8;
+        panel.add(new JLabel("Cliente (opcional):"), gbc);
+        comboCliente = new JComboBox<>();
+        comboCliente.addItem("NENHUM");
+        gbc.gridx = 1;
+        panel.add(comboCliente, gbc);
+        
+        JButton btnSalvar = new JButton("Registrar Transação");
+        btnSalvar.setFont(new Font("Arial", Font.BOLD, 14));
+        btnSalvar.addActionListener(e -> registrarTransacao());
+        
+        gbc.gridx = 0; gbc.gridy = 9;
+        gbc.gridwidth = 2;
+        panel.add(btnSalvar, gbc);
+        
+        return panel;
+    }
+    
+    private void carregarClientesCombo() {
+        comboCliente.removeAllItems();
+        comboCliente.addItem("NENHUM");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            comboCliente.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private void carregarTransacoes() {
+        List<TransacaoFinanceira> transacoes = transacaoDAO.listarTodas();
+        carregarTabelaTransacoes(transacoes);
+    }
+    
+    private void carregarTabelaTransacoes(List<TransacaoFinanceira> transacoes) {
+        tableModel.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (TransacaoFinanceira t : transacoes) {
+            Cliente c = t.getIdCliente() > 0 ? clienteDAO.buscarPorId(t.getIdCliente()) : null;
+            String nomeCliente = c != null ? c.getNomeExibicao() : "---";
+            
+            Object[] row = {
+                t.getId(),
+                t.getDataRegistro() != null ? sdf.format(t.getDataRegistro()) : "---",
+                t.getTipo(),
+                t.getNatureza(),
+                String.format("%.2f", t.getValor()),
+                t.getFormaPagamento(),
+                t.getStatus(),
+                nomeCliente,
+                t.getDescricao() != null ? (t.getDescricao().length() > 30 ? t.getDescricao().substring(0, 30) + "..." : t.getDescricao()) : ""
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void atualizarResumo() {
+        double saldo = transacaoDAO.calcularSaldo();
+        lblSaldo.setText(String.format("Saldo: R$ %.2f", saldo));
+        lblSaldo.setForeground(saldo >= 0 ? new Color(0, 100, 0) : Color.RED);
+        
+        double entradas = transacaoDAO.listarTodas().stream()
+            .filter(t -> "ENTRADA".equals(t.getTipo()) && "RECEBIDO".equals(t.getStatus()))
+            .mapToDouble(TransacaoFinanceira::getValor)
+            .sum();
+        
+        double saidas = transacaoDAO.listarTodas().stream()
+            .filter(t -> "SAIDA".equals(t.getTipo()) && "PAGO".equals(t.getStatus()))
+            .mapToDouble(TransacaoFinanceira::getValor)
+            .sum();
+        
+        lblTotalEntradas.setText(String.format("Total Entradas: R$ %.2f", entradas));
+        lblTotalSaidas.setText(String.format("Total Saídas: R$ %.2f", saidas));
+    }
+    
+    private void registrarTransacao() {
+        try {
+            double valor = Double.parseDouble(txtValor.getText().trim().replace(",", "."));
+            if (valor <= 0) {
+                JOptionPane.showMessageDialog(this, "Valor deve ser maior que zero!");
+                return;
+            }
+            
+            String descricao = txtDescricao.getText().trim();
+            if (descricao.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Descrição é obrigatória!");
+                return;
+            }
+            
+            TransacaoFinanceira t = new TransacaoFinanceira();
+            t.setTipo((String) comboTipo.getSelectedItem());
+            t.setNatureza((String) comboNatureza.getSelectedItem());
+            t.setFormaPagamento((String) comboFormaPagamento.getSelectedItem());
+            t.setValor(valor);
+            t.setDescricao(descricao);
+            t.setStatus((String) comboStatus.getSelectedItem());
+            t.setDataVencimento((Date) spDataVencimento.getValue());
+            t.setDocumentoReferencia(txtDocumentoRef.getText().trim());
+            t.setIdUsuarioRegistro(usuarioLogado.getId());
+            
+            if ("PAGO".equals(t.getStatus()) || "RECEBIDO".equals(t.getStatus())) {
+                t.setDataPagamento(new Date());
+            }
+            
+            String clienteSelecionado = (String) comboCliente.getSelectedItem();
+            if (clienteSelecionado != null && !"NENHUM".equals(clienteSelecionado)) {
+                int idCliente = Integer.parseInt(clienteSelecionado.split(" - ")[0]);
+                t.setIdCliente(idCliente);
+            }
+            
+            if (transacaoDAO.inserir(t)) {
+                JOptionPane.showMessageDialog(this, "Transação registrada com sucesso!");
+                
+                txtValor.setText("");
+                txtDescricao.setText("");
+                txtDocumentoRef.setText("");
+                comboTipo.setSelectedIndex(0);
+                comboNatureza.setSelectedIndex(0);
+                comboFormaPagamento.setSelectedIndex(0);
+                comboStatus.setSelectedIndex(0);
+                comboCliente.setSelectedIndex(0);
+                spDataVencimento.setValue(new Date());
+                
+                carregarTransacoes();
+                atualizarResumo();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao registrar transação!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+            
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Valor inválido! Use formato: 1234.56", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    // Métodos para navegação entre abas
+    public int getTabCount() {
+        return tabbedPane.getTabCount();
+    }
+    
+    public void setSelectedTab(int index) {
+        if (index >= 0 && index < tabbedPane.getTabCount()) {
+            tabbedPane.setSelectedIndex(index);
+        }
+    }
+}

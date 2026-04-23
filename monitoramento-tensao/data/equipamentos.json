@@ -1,0 +1,7 @@
+[ {
+  "id" : 1,
+  "marca" : "Equipamento de Teste",
+  "modelo" : "Modelo de Teste",
+  "tensaoNominal" : 19.0,
+  "idCliente" : 1
+} ]

@@ -1,0 +1,176 @@
+package com.monitoramento.dao;
+
+import com.monitoramento.model.Departamento;
+import com.monitoramento.util.DatabaseConnection;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class DepartamentoDAO {
+    
+    public boolean inserir(Departamento departamento) {
+        String sql = "INSERT INTO departamentos (nome, descricao) VALUES (?, ?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setString(1, departamento.getNome());
+            stmt.setString(2, departamento.getDescricao());
+            
+            int affectedRows = stmt.executeUpdate();
+            
+            if (affectedRows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        departamento.setId(rs.getInt(1));
+                    }
+                }
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean atualizar(Departamento departamento) {
+        String sql = "UPDATE departamentos SET nome = ?, descricao = ? WHERE id = ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, departamento.getNome());
+            stmt.setString(2, departamento.getDescricao());
+            stmt.setInt(3, departamento.getId());
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean excluir(int id) {
+        String sql = "DELETE FROM departamentos WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public Departamento buscarPorId(int id) {
+        String sql = "SELECT * FROM departamentos WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearDepartamento(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public Departamento buscarPorNome(String nome) {
+        String sql = "SELECT * FROM departamentos WHERE nome = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, nome);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapearDepartamento(rs);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    public List<Departamento> listarTodos() {
+        List<Departamento> departamentos = new ArrayList<>();
+        String sql = "SELECT * FROM departamentos ORDER BY nome";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                departamentos.add(mapearDepartamento(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return departamentos;
+    }
+    
+    public List<Departamento> buscarPorNomeContendo(String termo) {
+        List<Departamento> departamentos = new ArrayList<>();
+        String sql = "SELECT * FROM departamentos WHERE nome LIKE ? OR descricao LIKE ? ORDER BY nome";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, "%" + termo + "%");
+            stmt.setString(2, "%" + termo + "%");
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    departamentos.add(mapearDepartamento(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return departamentos;
+    }
+    
+    public boolean inicializarDepartamentosPadrao() {
+        // Verificar se já existem departamentos
+        List<Departamento> existentes = listarTodos();
+        if (!existentes.isEmpty()) {
+            System.out.println("Departamentos já inicializados");
+            return true;
+        }
+        
+        // Inserir departamentos padrão
+        String[] nomes = {"Administração", "Monitoração", "Suporte Técnico"};
+        String[] descricoes = {
+            "Departamento administrativo responsável pela gestão do sistema",
+            "Departamento responsável pelo monitoramento remoto",
+            "Departamento responsável pelo suporte técnico presencial"
+        };
+        
+        boolean sucesso = true;
+        for (int i = 0; i < nomes.length; i++) {
+            Departamento dept = new Departamento();
+            dept.setNome(nomes[i]);
+            dept.setDescricao(descricoes[i]);
+            if (!inserir(dept)) {
+                sucesso = false;
+                System.err.println("Erro ao inserir departamento: " + nomes[i]);
+            }
+        }
+        
+        return sucesso;
+    }
+    
+    private Departamento mapearDepartamento(ResultSet rs) throws SQLException {
+        Departamento departamento = new Departamento();
+        departamento.setId(rs.getInt("id"));
+        departamento.setNome(rs.getString("nome"));
+        departamento.setDescricao(rs.getString("descricao"));
+        return departamento;
+    }
+}

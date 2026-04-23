@@ -1,0 +1,85 @@
+// OrdemServico.java
+package com.monitoramento.model;
+
+import java.util.Date;
+
+public class OrdemServico {
+    private int id;
+    private int idCliente;
+    private int idEquipamento;
+    private String tipoNivel; // "1º Nível", "2º Nível" ou "3º Nível"
+    private String status; // "ABERTA", "EM_ATENDIMENTO", "FECHADA"
+    private String motivo;
+    private String descricaoSolucao;
+    private String falhaIdentificada; // "CLIENTE", "MONITORAMENTO", "INSTALACAO", "HARDWARE", "SOFTWARE"
+    private Date dataAbertura;
+    private Date dataFechamento;
+    private int idUsuarioAbertura;
+    private int idUsuarioFechamento;
+    
+    // NOVOS CAMPOS PARA ORDEM DE INSTALAÇÃO
+    private String tipoOrdem; // "SERVICO", "INSTALACAO" - Para diferenciar OS normal de OS de instalação
+    private int idAtendimentoOrigem; // ID do atendimento tipo ORDEM_INSTALACAO que gerou esta OS
+    private double valorTotal; // Valor total da instalação
+    private String enderecoInstalacao; // Endereço onde será feita a instalação
+    private String produtosInstalados; // Lista de produtos instalados (formato JSON ou texto)
+    private String dataAgendamento; // Data agendada para instalação
+    private String observacoes; // Observações adicionais
+    
+    // Construtores
+    public OrdemServico() {}
+    
+    // Getters e Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public int getIdCliente() { return idCliente; }
+    public void setIdCliente(int idCliente) { this.idCliente = idCliente; }
+    public int getIdEquipamento() { return idEquipamento; }
+    public void setIdEquipamento(int idEquipamento) { this.idEquipamento = idEquipamento; }
+    public String getTipoNivel() { return tipoNivel; }
+    public void setTipoNivel(String tipoNivel) { this.tipoNivel = tipoNivel; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getMotivo() { return motivo; }
+    public void setMotivo(String motivo) { this.motivo = motivo; }
+    public String getDescricaoSolucao() { return descricaoSolucao; }
+    public void setDescricaoSolucao(String descricaoSolucao) { this.descricaoSolucao = descricaoSolucao; }
+    public String getFalhaIdentificada() { return falhaIdentificada; }
+    public void setFalhaIdentificada(String falhaIdentificada) { this.falhaIdentificada = falhaIdentificada; }
+    public Date getDataAbertura() { return dataAbertura; }
+    public void setDataAbertura(Date dataAbertura) { this.dataAbertura = dataAbertura; }
+    public Date getDataFechamento() { return dataFechamento; }
+    public void setDataFechamento(Date dataFechamento) { this.dataFechamento = dataFechamento; }
+    public int getIdUsuarioAbertura() { return idUsuarioAbertura; }
+    public void setIdUsuarioAbertura(int idUsuarioAbertura) { this.idUsuarioAbertura = idUsuarioAbertura; }
+    public int getIdUsuarioFechamento() { return idUsuarioFechamento; }
+    public void setIdUsuarioFechamento(int idUsuarioFechamento) { this.idUsuarioFechamento = idUsuarioFechamento; }
+    
+    // NOVOS GETTERS E SETTERS
+    public String getTipoOrdem() { return tipoOrdem; }
+    public void setTipoOrdem(String tipoOrdem) { this.tipoOrdem = tipoOrdem; }
+    public int getIdAtendimentoOrigem() { return idAtendimentoOrigem; }
+    public void setIdAtendimentoOrigem(int idAtendimentoOrigem) { this.idAtendimentoOrigem = idAtendimentoOrigem; }
+    public double getValorTotal() { return valorTotal; }
+    public void setValorTotal(double valorTotal) { this.valorTotal = valorTotal; }
+    public String getEnderecoInstalacao() { return enderecoInstalacao; }
+    public void setEnderecoInstalacao(String enderecoInstalacao) { this.enderecoInstalacao = enderecoInstalacao; }
+    public String getProdutosInstalados() { return produtosInstalados; }
+    public void setProdutosInstalados(String produtosInstalados) { this.produtosInstalados = produtosInstalados; }
+    public String getDataAgendamento() { return dataAgendamento; }
+    public void setDataAgendamento(String dataAgendamento) { this.dataAgendamento = dataAgendamento; }
+    public String getObservacoes() { return observacoes; }
+    public void setObservacoes(String observacoes) { this.observacoes = observacoes; }
+    
+    // Métodos auxiliares
+    public String getNomeExibicao() {
+        if ("INSTALACAO".equals(tipoOrdem)) {
+            return "OS Instalação #" + id;
+        }
+        return "OS #" + id;
+    }
+    
+    public boolean isInstalacao() {
+        return "INSTALACAO".equals(tipoOrdem);
+    }
+}

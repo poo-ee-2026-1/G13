@@ -1,0 +1,540 @@
+package com.monitoramento.ui;
+
+import com.monitoramento.dao.*;
+import com.monitoramento.model.*;
+import com.monitoramento.service.MonitoramentoService;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaRelatorios extends JFrame {
+    private Usuario usuarioLogado;
+    private MonitoramentoService monitoramentoService;
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private MedicaoTensaoDAO medicaoDAO;
+    private OrdemServicoDAO ordemServicoDAO;
+    
+    private JTabbedPane tabbedPane;
+    private JComboBox<String> comboCliente;
+    private JTextField txtDataInicio, txtDataFim;
+    private JTable tabelaMedicoes;
+    private DefaultTableModel tableModelMedicoes;
+    
+    public TelaRelatorios(Usuario usuario, MonitoramentoService monitoramentoService) {
+        this.usuarioLogado = usuario;
+        this.monitoramentoService = monitoramentoService;
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.medicaoDAO = new MedicaoTensaoDAO();
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        
+        initComponents();
+        carregarClientesCombo();
+        setLocationRelativeTo(null);
+    }
+    
+    private void initComponents() {
+        setTitle("Relatórios do Sistema - Usuário: " + usuarioLogado.getLogin());
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setSize(1000, 700);
+        setLayout(new BorderLayout());
+        
+        tabbedPane = new JTabbedPane();
+        
+        // Aba de Medições
+        tabbedPane.addTab("Medições de Tensão", criarPainelMedicoes());
+        
+        // Aba de Ordens de Serviço
+        tabbedPane.addTab("Ordens de Serviço", criarPainelOrdens());
+        
+        // Aba de Disponibilidade
+        tabbedPane.addTab("Disponibilidade", criarPainelDisponibilidade());
+        
+        // Aba de Estatísticas Gerais
+        tabbedPane.addTab("Estatísticas Gerais", criarPainelEstatisticas());
+        
+        // Botão de exportar
+        JPanel painelBotoes = new JPanel(new FlowLayout());
+        JButton btnExportar = new JButton("Exportar Relatório (CSV)");
+        JButton btnFechar = new JButton("Fechar");
+        
+        btnExportar.addActionListener(e -> exportarRelatorio());
+        btnFechar.addActionListener(e -> dispose());
+        
+        painelBotoes.add(btnExportar);
+        painelBotoes.add(btnFechar);
+        
+        add(tabbedPane, BorderLayout.CENTER);
+        add(painelBotoes, BorderLayout.SOUTH);
+    }
+    
+    private JPanel criarPainelMedicoes() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Painel de filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboCliente = new JComboBox<>();
+        comboCliente.setPreferredSize(new Dimension(250, 25));
+        
+        painelFiltros.add(new JLabel("Data Início:"));
+        txtDataInicio = new JTextField(10);
+        txtDataInicio.setToolTipText("dd/MM/yyyy");
+        
+        painelFiltros.add(new JLabel("Data Fim:"));
+        txtDataFim = new JTextField(10);
+        txtDataFim.setToolTipText("dd/MM/yyyy");
+        
+        JButton btnBuscar = new JButton("Buscar");
+        JButton btnLimpar = new JButton("Limpar");
+        
+        btnBuscar.addActionListener(e -> buscarMedicoes());
+        btnLimpar.addActionListener(e -> {
+            txtDataInicio.setText("");
+            txtDataFim.setText("");
+            tableModelMedicoes.setRowCount(0);
+        });
+        
+        painelFiltros.add(comboCliente);
+        painelFiltros.add(txtDataInicio);
+        painelFiltros.add(txtDataFim);
+        painelFiltros.add(btnBuscar);
+        painelFiltros.add(btnLimpar);
+        
+        // Tabela de medições
+        String[] colunas = {"ID", "Data/Hora", "Tensão (V)", "Estado da Rede", "Situação"};
+        tableModelMedicoes = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaMedicoes = new JTable(tableModelMedicoes);
+        tabelaMedicoes.setRowHeight(25);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaMedicoes);
+        
+        // Painel de resumo
+        JPanel painelResumo = new JPanel(new GridLayout(2, 3, 10, 10));
+        painelResumo.setBorder(BorderFactory.createTitledBorder("Resumo"));
+        
+        JLabel lblTotalMedicoes = new JLabel("Total: 0");
+        JLabel lblTensaoMedia = new JLabel("Média: 0 V");
+        JLabel lblTensaoMin = new JLabel("Mínima: 0 V");
+        JLabel lblTensaoMax = new JLabel("Máxima: 0 V");
+        JLabel lblAlertas = new JLabel("Alertas: 0");
+        JLabel lblCriticos = new JLabel("Críticos: 0");
+        
+        painelResumo.add(lblTotalMedicoes);
+        painelResumo.add(lblTensaoMedia);
+        painelResumo.add(lblTensaoMin);
+        painelResumo.add(lblTensaoMax);
+        painelResumo.add(lblAlertas);
+        painelResumo.add(lblCriticos);
+        
+        panel.add(painelFiltros, BorderLayout.NORTH);
+        panel.add(scrollTabela, BorderLayout.CENTER);
+        panel.add(painelResumo, BorderLayout.SOUTH);
+        
+        // Placeholder para atualizar resumo
+        btnBuscar.addActionListener(e -> {
+            // Atualizar resumo será feito no buscarMedicoes
+        });
+        
+        return panel;
+    }
+    
+    private void carregarClientesCombo() {
+        comboCliente.removeAllItems();
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        
+        for (Cliente c : clientes) {
+            String nomeExibicao = c.getTipo().equals("FISICA") ? 
+                c.getNome() + " " + (c.getSobrenome() != null ? c.getSobrenome() : "") : 
+                (c.getRazaoSocial() != null ? c.getRazaoSocial() : "");
+            comboCliente.addItem(c.getId() + " - " + nomeExibicao);
+        }
+    }
+    
+    private void buscarMedicoes() {
+        if (comboCliente.getSelectedIndex() == -1) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return;
+        }
+        
+        int idCliente = Integer.parseInt(((String) comboCliente.getSelectedItem()).split(" - ")[0]);
+        
+        Date dataInicio;
+        Date dataFim;
+        
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            
+            if (txtDataInicio.getText().trim().isEmpty()) {
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.DAY_OF_YEAR, -30);
+                dataInicio = cal.getTime();
+            } else {
+                dataInicio = sdf.parse(txtDataInicio.getText().trim());
+            }
+            
+            if (txtDataFim.getText().trim().isEmpty()) {
+                dataFim = new Date();
+            } else {
+                dataFim = sdf.parse(txtDataFim.getText().trim());
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(dataFim);
+                cal.set(Calendar.HOUR_OF_DAY, 23);
+                cal.set(Calendar.MINUTE, 59);
+                cal.set(Calendar.SECOND, 59);
+                dataFim = cal.getTime();
+            }
+            
+            List<MedicaoTensao> medicoes = medicaoDAO.buscarPorCliente(idCliente, dataInicio, dataFim);
+            
+            tableModelMedicoes.setRowCount(0);
+            SimpleDateFormat sdfHora = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+            
+            double soma = 0;
+            double min = Double.MAX_VALUE;
+            double max = Double.MIN_VALUE;
+            int alertas = 0;
+            int criticos = 0;
+            
+            for (MedicaoTensao m : medicoes) {
+                Object[] row = {
+                    m.getId(),
+                    sdfHora.format(m.getDataHora()),
+                    String.format("%.2f", m.getTensao()),
+                    m.getEstadoRede(),
+                    m.getSituacaoRede()
+                };
+                tableModelMedicoes.addRow(row);
+                
+                soma += m.getTensao();
+                if (m.getTensao() < min) min = m.getTensao();
+                if (m.getTensao() > max) max = m.getTensao();
+                if ("ALERTA".equals(m.getSituacaoRede())) alertas++;
+                if ("CRÍTICO".equals(m.getSituacaoRede())) criticos++;
+            }
+            
+            // Atualizar labels de resumo
+            JPanel painelResumo = (JPanel) ((BorderLayout) ((JPanel) tabbedPane.getComponentAt(0)).getLayout()).getLayoutComponent(BorderLayout.SOUTH);
+            Component[] comps = painelResumo.getComponents();
+            
+            int total = medicoes.size();
+            ((JLabel) comps[0]).setText("Total: " + total);
+            ((JLabel) comps[1]).setText(String.format("Média: %.2f V", total > 0 ? soma / total : 0));
+            ((JLabel) comps[2]).setText(String.format("Mínima: %.2f V", min != Double.MAX_VALUE ? min : 0));
+            ((JLabel) comps[3]).setText(String.format("Máxima: %.2f V", max != Double.MIN_VALUE ? max : 0));
+            ((JLabel) comps[4]).setText("Alertas: " + alertas);
+            ((JLabel) comps[5]).setText("Críticos: " + criticos);
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erro ao buscar medições: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private JPanel criarPainelOrdens() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        JComboBox<String> comboStatus = new JComboBox<>(new String[]{"TODAS", "ABERTA", "FECHADA"});
+        JComboBox<String> comboNivel = new JComboBox<>(new String[]{"TODOS", "1º Nível", "2º Nível"});
+        JButton btnBuscarOS = new JButton("Buscar");
+        
+        painelFiltros.add(new JLabel("Status:"));
+        painelFiltros.add(comboStatus);
+        painelFiltros.add(new JLabel("Nível:"));
+        painelFiltros.add(comboNivel);
+        painelFiltros.add(btnBuscarOS);
+        
+        // Tabela
+        String[] colunas = {"ID", "Cliente", "Motivo", "Nível", "Status", "Abertura", "Fechamento", "Falha"};
+        DefaultTableModel tableModelOS = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tabelaOS = new JTable(tableModelOS);
+        JScrollPane scrollTabela = new JScrollPane(tabelaOS);
+        
+        btnBuscarOS.addActionListener(e -> {
+            String status = (String) comboStatus.getSelectedItem();
+            String nivel = (String) comboNivel.getSelectedItem();
+            
+            List<OrdemServico> ordens;
+            
+            if ("TODAS".equals(status)) {
+                ordens = ordemServicoDAO.listarTodas();
+            } else {
+                ordens = ordemServicoDAO.buscarPorStatus(status);
+            }
+            
+            if (!"TODOS".equals(nivel)) {
+                ordens = ordens.stream().filter(os -> os.getTipoNivel().equals(nivel)).toList();
+            }
+            
+            tableModelOS.setRowCount(0);
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+            
+            for (OrdemServico os : ordens) {
+                Cliente c = clienteDAO.buscarPorId(os.getIdCliente());
+                String nomeCliente = c != null ? c.getNomeExibicao() : "N/A";
+                
+                Object[] row = {
+                    os.getId(),
+                    nomeCliente,
+                    os.getMotivo() != null ? (os.getMotivo().length() > 40 ? os.getMotivo().substring(0, 40) + "..." : os.getMotivo()) : "",
+                    os.getTipoNivel(),
+                    os.getStatus(),
+                    os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                    os.getDataFechamento() != null ? sdf.format(os.getDataFechamento()) : "",
+                    os.getFalhaIdentificada() != null ? os.getFalhaIdentificada() : ""
+                };
+                tableModelOS.addRow(row);
+            }
+        });
+        
+        panel.add(painelFiltros, BorderLayout.NORTH);
+        panel.add(scrollTabela, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelDisponibilidade() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JPanel painelTopo = new JPanel(new GridLayout(1, 2, 10, 10));
+        
+        JPanel painelClientes = new JPanel(new BorderLayout());
+        painelClientes.setBorder(BorderFactory.createTitledBorder("Clientes em Monitoramento"));
+        
+        String[] colunasClientes = {"ID", "Cliente", "Disponibilidade", "Medições", "Ativo", "Inativo"};
+        DefaultTableModel tableModelClientes = new DefaultTableModel(colunasClientes, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tabelaClientesDisp = new JTable(tableModelClientes);
+        JScrollPane scrollClientes = new JScrollPane(tabelaClientesDisp);
+        painelClientes.add(scrollClientes, BorderLayout.CENTER);
+        
+        JButton btnAtualizarDisp = new JButton("Atualizar Disponibilidade");
+        btnAtualizarDisp.addActionListener(e -> {
+            tableModelClientes.setRowCount(0);
+            var dadosList = monitoramentoService.listarTodosDadosMonitoramento();
+            
+            for (var dados : dadosList) {
+                Cliente c = clienteDAO.buscarPorId(dados.getIdCliente());
+                if (c != null) {
+                    double disp = monitoramentoService.calcularDisponibilidade(dados.getIdCliente());
+                    Object[] row = {
+                        dados.getIdCliente(),
+                        c.getNomeExibicao(),
+                        String.format("%.2f%%", disp),
+                        dados.getContadorMedicoes(),
+                        dados.getContadorAtivo(),
+                        dados.getContadorInativo()
+                    };
+                    tableModelClientes.addRow(row);
+                }
+            }
+        });
+        
+        painelTopo.add(painelClientes);
+        
+        JPanel painelGrafico = new JPanel();
+        painelGrafico.setBorder(BorderFactory.createTitledBorder("Resumo Geral"));
+        painelGrafico.setLayout(new BoxLayout(painelGrafico, BoxLayout.Y_AXIS));
+        
+        JLabel lblMediaGeral = new JLabel("Disponibilidade Média Geral: --");
+        JLabel lblTotalClientes = new JLabel("Total Clientes Monitorados: --");
+        JLabel lblMediaAtivo = new JLabel("Média de Medições Ativas: --");
+        
+        painelGrafico.add(Box.createVerticalStrut(20));
+        painelGrafico.add(lblMediaGeral);
+        painelGrafico.add(Box.createVerticalStrut(10));
+        painelGrafico.add(lblTotalClientes);
+        painelGrafico.add(Box.createVerticalStrut(10));
+        painelGrafico.add(lblMediaAtivo);
+        
+        btnAtualizarDisp.addActionListener(e -> {
+            var dadosList = monitoramentoService.listarTodosDadosMonitoramento();
+            double somaDisp = 0;
+            int totalMedicoesAtivas = 0;
+            int totalMedicoes = 0;
+            
+            for (var dados : dadosList) {
+                double disp = monitoramentoService.calcularDisponibilidade(dados.getIdCliente());
+                somaDisp += disp;
+                totalMedicoesAtivas += dados.getContadorAtivo();
+                totalMedicoes += dados.getContadorMedicoes();
+            }
+            
+            double mediaDisp = dadosList.isEmpty() ? 0 : somaDisp / dadosList.size();
+            lblMediaGeral.setText(String.format("Disponibilidade Média Geral: %.2f%%", mediaDisp));
+            lblTotalClientes.setText("Total Clientes Monitorados: " + dadosList.size());
+            lblMediaAtivo.setText(String.format("Média de Medições Ativas: %.1f%%", 
+                totalMedicoes > 0 ? (totalMedicoesAtivas * 100.0 / totalMedicoes) : 0));
+        });
+        
+        painelTopo.add(painelGrafico);
+        
+        panel.add(painelTopo, BorderLayout.CENTER);
+        panel.add(btnAtualizarDisp, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelEstatisticas() {
+        JPanel panel = new JPanel(new GridLayout(0, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        
+        JPanel painelOS = new JPanel(new BorderLayout());
+        painelOS.setBorder(BorderFactory.createTitledBorder("Estatísticas de OS"));
+        
+        JTextArea txtEstatisticasOS = new JTextArea();
+        txtEstatisticasOS.setEditable(false);
+        JScrollPane scrollOS = new JScrollPane(txtEstatisticasOS);
+        painelOS.add(scrollOS, BorderLayout.CENTER);
+        
+        JPanel painelMedicoes = new JPanel(new BorderLayout());
+        painelMedicoes.setBorder(BorderFactory.createTitledBorder("Estatísticas de Medições"));
+        
+        JTextArea txtEstatisticasMed = new JTextArea();
+        txtEstatisticasMed.setEditable(false);
+        JScrollPane scrollMed = new JScrollPane(txtEstatisticasMed);
+        painelMedicoes.add(scrollMed, BorderLayout.CENTER);
+        
+        JButton btnCarregarStats = new JButton("Carregar Estatísticas");
+        btnCarregarStats.addActionListener(e -> {
+            // Estatísticas de OS
+            List<OrdemServico> todasOS = ordemServicoDAO.listarTodas();
+            List<OrdemServico> abertas = ordemServicoDAO.buscarPorStatus("ABERTA");
+            List<OrdemServico> fechadas = ordemServicoDAO.buscarPorStatus("FECHADA");
+            
+            long totalCliente = 0;
+            long totalMonitoramento = 0;
+            for (OrdemServico os : fechadas) {
+                if ("CLIENTE".equals(os.getFalhaIdentificada())) totalCliente++;
+                if ("MONITORAMENTO".equals(os.getFalhaIdentificada())) totalMonitoramento++;
+            }
+            
+            StringBuilder sbOS = new StringBuilder();
+            sbOS.append("=== ORDENS DE SERVIÇO ===\n\n");
+            sbOS.append("Total de OS: ").append(todasOS.size()).append("\n");
+            sbOS.append("OS Abertas: ").append(abertas.size()).append("\n");
+            sbOS.append("OS Fechadas: ").append(fechadas.size()).append("\n");
+            sbOS.append("Falhas identificadas:\n");
+            sbOS.append("  - Cliente: ").append(totalCliente).append("\n");
+            sbOS.append("  - Monitoramento: ").append(totalMonitoramento).append("\n");
+            
+            double tempoMedio = ordemServicoDAO.calcularTempoMedioResolucao(
+                new Date(System.currentTimeMillis() - 90L * 24 * 60 * 60 * 1000),
+                new Date()
+            );
+            sbOS.append("\nTempo médio de resolução (90 dias): ");
+            sbOS.append(String.format("%.1f horas", tempoMedio));
+            
+            txtEstatisticasOS.setText(sbOS.toString());
+            
+            // Estatísticas de Medições
+            List<Cliente> clientes = clienteDAO.listarTodos();
+            int totalEquipamentos = equipamentoDAO.listarTodos().size();
+            
+            StringBuilder sbMed = new StringBuilder();
+            sbMed.append("=== MEDIÇÕES ===\n\n");
+            sbMed.append("Total de Clientes: ").append(clientes.size()).append("\n");
+            sbMed.append("Clientes em Monitoramento: ");
+            sbMed.append(clienteDAO.listarPorMonitoramento(true).size()).append("\n");
+            sbMed.append("Total de Equipamentos: ").append(totalEquipamentos).append("\n");
+            
+            var dadosMonitorados = monitoramentoService.listarTodosDadosMonitoramento();
+            int totalAtivos = 0;
+            for (var dados : dadosMonitorados) {
+                if ("ATIVO".equals(dados.getEstadoRedeAtual())) totalAtivos++;
+            }
+            sbMed.append("Clientes Ativos no momento: ").append(totalAtivos).append("\n");
+            
+            txtEstatisticasMed.setText(sbMed.toString());
+        });
+        
+        JPanel painelBotoesStats = new JPanel();
+        painelBotoesStats.add(btnCarregarStats);
+        
+        panel.add(painelOS);
+        panel.add(painelMedicoes);
+        panel.add(painelBotoesStats);
+        
+        return panel;
+    }
+    
+    private void exportarRelatorio() {
+        int abaSelecionada = tabbedPane.getSelectedIndex();
+        String nomeArquivo = JOptionPane.showInputDialog(this, "Nome do arquivo (sem extensão):", 
+            "relatorio_" + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()));
+        
+        if (nomeArquivo == null || nomeArquivo.trim().isEmpty()) return;
+        
+        try (PrintWriter writer = new PrintWriter(new FileWriter(nomeArquivo + ".csv"))) {
+            
+            if (abaSelecionada == 0) {
+                // Exportar medições
+                writer.println("ID,Data/Hora,Tensão (V),Estado da Rede,Situação");
+                for (int i = 0; i < tableModelMedicoes.getRowCount(); i++) {
+                    writer.printf("%d,%s,%s,%s,%s%n",
+                        tableModelMedicoes.getValueAt(i, 0),
+                        tableModelMedicoes.getValueAt(i, 1),
+                        tableModelMedicoes.getValueAt(i, 2),
+                        tableModelMedicoes.getValueAt(i, 3),
+                        tableModelMedicoes.getValueAt(i, 4));
+                }
+            } else if (abaSelecionada == 1) {
+                // Exportar OS
+                writer.println("ID,Cliente,Motivo,Nível,Status,Abertura,Fechamento,Falha");
+                JTable tabelaOS = (JTable) ((JScrollPane) ((JPanel) tabbedPane.getComponentAt(1)).getComponent(1)).getViewport().getView();
+                DefaultTableModel model = (DefaultTableModel) tabelaOS.getModel();
+                for (int i = 0; i < model.getRowCount(); i++) {
+                    writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
+                        model.getValueAt(i, 0),
+                        model.getValueAt(i, 1),
+                        model.getValueAt(i, 2),
+                        model.getValueAt(i, 3),
+                        model.getValueAt(i, 4),
+                        model.getValueAt(i, 5),
+                        model.getValueAt(i, 6),
+                        model.getValueAt(i, 7));
+                }
+            }
+            
+            JOptionPane.showMessageDialog(this, "Relatório exportado com sucesso!\nArquivo: " + nomeArquivo + ".csv");
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erro ao exportar relatório: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}

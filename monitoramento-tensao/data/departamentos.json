@@ -1,0 +1,29 @@
+[ {
+  "id" : 1,
+  "nome" : "ADMINISTRAÇÃO",
+  "descricao" : "Departamento administrativo responsável pela gestão da empresa e do sistema",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 2,
+  "nome" : "MONITORAMENTO",
+  "descricao" : "Departamento responsável pelo monitoramento remoto",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 3,
+  "nome" : "SUPORTE TÉCNICO",
+  "descricao" : "Departamento responsável pelo suporte técnico presencial",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 4,
+  "nome" : "ATENDIMENTO",
+  "descricao" : "Departamento responsável pelo atendimento ao cliente",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+} ]

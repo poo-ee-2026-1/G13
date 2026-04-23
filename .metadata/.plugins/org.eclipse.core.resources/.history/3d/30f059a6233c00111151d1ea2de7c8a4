@@ -1,0 +1,63 @@
+package com.monitoramento;
+
+import com.monitoramento.service.MonitoramentoService;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.service.WebSocketServer;
+import com.monitoramento.ui.TelaLogin;
+
+import javax.swing.SwingUtilities;
+
+public class Main {
+    private static WebSocketServer webSocketServer;
+    private static MonitoramentoService monitoramentoService;
+    private static OrdemServicoService ordemServicoService;
+    
+    public static void main(String[] args) {
+        // Inicializar serviços
+        monitoramentoService = new MonitoramentoService();
+        ordemServicoService = new OrdemServicoService(monitoramentoService);
+        
+        // Iniciar WebSocket Server em thread separada
+        iniciarWebSocketServer();
+        
+        // Iniciar interface gráfica
+        SwingUtilities.invokeLater(() -> {
+            new TelaLogin().setVisible(true);
+        });
+        
+        // Adicionar hook para desligamento gracioso
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Desligando sistema...");
+            if (webSocketServer != null) {
+                webSocketServer.pararServidor();
+            }
+        }));
+    }
+    
+    private static void iniciarWebSocketServer() {
+        Thread websocketThread = new Thread(() -> {
+            try {
+                webSocketServer = new WebSocketServer(monitoramentoService);
+                webSocketServer.start();
+                System.out.println("WebSocket Server iniciado na porta 8080");
+            } catch (Exception e) {
+                System.err.println("Erro ao iniciar WebSocket Server: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+        websocketThread.setDaemon(true);
+        websocketThread.start();
+    }
+    
+    public static WebSocketServer getWebSocketServer() {
+        return webSocketServer;
+    }
+    
+    public static MonitoramentoService getMonitoramentoService() {
+        return monitoramentoService;
+    }
+    
+    public static OrdemServicoService getOrdemServicoService() {
+        return ordemServicoService;
+    }
+}

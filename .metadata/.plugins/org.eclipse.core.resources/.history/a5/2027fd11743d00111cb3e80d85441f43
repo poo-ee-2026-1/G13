@@ -1,0 +1,27 @@
+// InstalacaoProduto.java
+package com.monitoramento.model;
+
+public class InstalacaoProduto {
+    private int id;
+    private int idOrdemInstalacao; // ID do atendimento tipo ORDEM_INSTALACAO
+    private int idProduto;
+    private int quantidade;
+    private double precoUnitario;
+    private double subtotal;
+    
+    public InstalacaoProduto() {}
+    
+    // Getters e Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public int getIdOrdemInstalacao() { return idOrdemInstalacao; }
+    public void setIdOrdemInstalacao(int idOrdemInstalacao) { this.idOrdemInstalacao = idOrdemInstalacao; }
+    public int getIdProduto() { return idProduto; }
+    public void setIdProduto(int idProduto) { this.idProduto = idProduto; }
+    public int getQuantidade() { return quantidade; }
+    public void setQuantidade(int quantidade) { this.quantidade = quantidade; }
+    public double getPrecoUnitario() { return precoUnitario; }
+    public void setPrecoUnitario(double precoUnitario) { this.precoUnitario = precoUnitario; }
+    public double getSubtotal() { return subtotal; }
+    public void setSubtotal(double subtotal) { this.subtotal = subtotal; }
+}

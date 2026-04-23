@@ -1,0 +1,908 @@
+// TelaVendas.java - Versão atualizada usando OrdemServico para instalações
+package com.monitoramento.ui;
+
+import com.monitoramento.model.*;
+import com.monitoramento.dao.*;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+
+public class TelaVendas extends JPanel {
+    private AtendimentoDAO atendimentoDAO;
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private TransacaoFinanceiraDAO transacaoDAO;
+    private OrdemServicoDAO ordemServicoDAO;  // AGORA USA OrdemServicoDAO
+    private ProdutoEstoqueDAO produtoEstoqueDAO;
+    private InstalacaoProdutoDAO instalacaoProdutoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOrcamentos, tabelaInstalacoes;
+    private DefaultTableModel modelOrcamentos, modelInstalacoes;
+    private JComboBox<String> comboClienteOrcamento;
+    private JTextField txtValorOrcamento, txtDescricaoOrcamento, txtDataAgendamento, txtEnderecoInstalacao;
+    private JTextArea txtDetalhesOrcamento, txtObservacoes;
+    private JTabbedPane tabbedPane;
+    
+    private List<InstalacaoProduto> produtosSelecionados;
+    private DefaultTableModel modelProdutosSelecionados;
+    private JTable tabelaProdutosSelecionados;
+    
+    public TelaVendas(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.atendimentoDAO = new AtendimentoDAO();
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.transacaoDAO = new TransacaoFinanceiraDAO();
+        this.ordemServicoDAO = new OrdemServicoDAO();  // Usando OrdemServicoDAO
+        this.produtoEstoqueDAO = new ProdutoEstoqueDAO();
+        this.instalacaoProdutoDAO = new InstalacaoProdutoDAO();
+        this.produtosSelecionados = new ArrayList<>();
+        
+        initComponents();
+        carregarClientesCombos();
+        carregarOrcamentos();
+        carregarOrdensInstalacao();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        tabbedPane = new JTabbedPane();
+        
+        tabbedPane.addTab("Orçamentos", criarPainelOrcamentos());
+        tabbedPane.addTab("Ordens de Instalação", criarPainelOrdensInstalacao());
+        tabbedPane.addTab("Novo Orçamento", criarPainelNovoOrcamento());
+        tabbedPane.addTab("Aprovar Orçamento", criarPainelAprovarOrcamento());
+        
+        add(tabbedPane, BorderLayout.CENTER);
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnAtualizar = new JButton("Atualizar");
+        btnAtualizar.addActionListener(e -> {
+            carregarOrcamentos();
+            carregarOrdensInstalacao();
+        });
+        
+        toolBar.add(btnAtualizar);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        add(toolBar, BorderLayout.NORTH);
+    }
+    
+    private JPanel criarPainelOrcamentos() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        String[] colunas = {"ID", "Cliente", "Valor (R$)", "Status", "Data", "Descrição"};
+        modelOrcamentos = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOrcamentos = new JTable(modelOrcamentos);
+        JScrollPane scroll = new JScrollPane(tabelaOrcamentos);
+        
+        JButton btnRecusar = new JButton("Recusar Orçamento");
+        JButton btnDetalhes = new JButton("Ver Detalhes");
+        
+        btnRecusar.addActionListener(e -> recusarOrcamento());
+        btnDetalhes.addActionListener(e -> verDetalhesOrcamento());
+        
+        JPanel botoes = new JPanel(new FlowLayout());
+        botoes.add(btnDetalhes);
+        botoes.add(btnRecusar);
+        
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(botoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelOrdensInstalacao() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        String[] colunas = {"ID", "Cliente", "Valor (R$)", "Status", "Data Abertura", "Data Conclusão", "Data Agendamento"};
+        modelInstalacoes = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaInstalacoes = new JTable(modelInstalacoes);
+        JScrollPane scroll = new JScrollPane(tabelaInstalacoes);
+        
+        JButton btnConcluir = new JButton("Concluir Instalação");
+        JButton btnDetalhes = new JButton("Ver Detalhes");
+        JButton btnAgendar = new JButton("Agendar/Reagendar");
+        
+        btnConcluir.addActionListener(e -> concluirInstalacao());
+        btnDetalhes.addActionListener(e -> verDetalhesInstalacao());
+        btnAgendar.addActionListener(e -> agendarInstalacao());
+        
+        JPanel botoes = new JPanel(new FlowLayout());
+        botoes.add(btnDetalhes);
+        botoes.add(btnAgendar);
+        botoes.add(btnConcluir);
+        
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(botoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelSelecaoProdutos() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Produtos para Instalação"));
+        
+        JPanel panelTopo = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelTopo.add(new JLabel("Produto:"));
+        JComboBox<String> comboProduto = new JComboBox<>();
+        comboProduto.setPreferredSize(new Dimension(350, 25));
+        
+        List<ProdutoEstoque> produtos = produtoEstoqueDAO.listarAtivos();
+        for (ProdutoEstoque p : produtos) {
+            comboProduto.addItem(p.getId() + " - " + p.getNomeCompleto() + " (Estoque: " + p.getQuantidade() + ")");
+        }
+        
+        JSpinner spQuantidade = new JSpinner(new SpinnerNumberModel(1, 1, 999, 1));
+        spQuantidade.setPreferredSize(new Dimension(80, 25));
+        
+        JButton btnAdicionar = new JButton("Adicionar Produto");
+        
+        panelTopo.add(comboProduto);
+        panelTopo.add(new JLabel("Quantidade:"));
+        panelTopo.add(spQuantidade);
+        panelTopo.add(btnAdicionar);
+        
+        String[] colunas = {"ID Produto", "Produto", "Quantidade", "Preço Unitário", "Subtotal"};
+        modelProdutosSelecionados = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaProdutosSelecionados = new JTable(modelProdutosSelecionados);
+        tabelaProdutosSelecionados.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaProdutosSelecionados.getColumnModel().getColumn(1).setPreferredWidth(300);
+        tabelaProdutosSelecionados.getColumnModel().getColumn(2).setPreferredWidth(80);
+        tabelaProdutosSelecionados.getColumnModel().getColumn(3).setPreferredWidth(100);
+        tabelaProdutosSelecionados.getColumnModel().getColumn(4).setPreferredWidth(100);
+        
+        JScrollPane scroll = new JScrollPane(tabelaProdutosSelecionados);
+        
+        JButton btnRemover = new JButton("Remover Selecionado");
+        JPanel panelBotoes = new JPanel();
+        panelBotoes.add(btnRemover);
+        
+        btnAdicionar.addActionListener(e -> {
+            if (comboProduto.getSelectedIndex() == -1) return;
+            
+            String selected = (String) comboProduto.getSelectedItem();
+            int idProduto = Integer.parseInt(selected.split(" - ")[0]);
+            int quantidade = (int) spQuantidade.getValue();
+            
+            ProdutoEstoque produto = produtoEstoqueDAO.buscarPorId(idProduto);
+            if (produto == null) return;
+            
+            if (produto.getQuantidade() < quantidade) {
+                JOptionPane.showMessageDialog(panel, 
+                    "Estoque insuficiente!\nDisponível: " + produto.getQuantidade() + 
+                    "\nSolicitado: " + quantidade, 
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            InstalacaoProduto existente = produtosSelecionados.stream()
+                .filter(ip -> ip.getIdProduto() == idProduto)
+                .findFirst()
+                .orElse(null);
+            
+            if (existente != null) {
+                existente.setQuantidade(existente.getQuantidade() + quantidade);
+                existente.setSubtotal(existente.getQuantidade() * existente.getPrecoUnitario());
+                
+                for (int i = 0; i < modelProdutosSelecionados.getRowCount(); i++) {
+                    if ((int) modelProdutosSelecionados.getValueAt(i, 0) == idProduto) {
+                        modelProdutosSelecionados.setValueAt(existente.getQuantidade(), i, 2);
+                        modelProdutosSelecionados.setValueAt(String.format("R$ %.2f", existente.getSubtotal()), i, 4);
+                        break;
+                    }
+                }
+            } else {
+                InstalacaoProduto item = new InstalacaoProduto();
+                item.setIdProduto(idProduto);
+                item.setQuantidade(quantidade);
+                item.setPrecoUnitario(produto.getPrecoVenda());
+                item.setSubtotal(quantidade * produto.getPrecoVenda());
+                produtosSelecionados.add(item);
+                
+                Object[] row = {
+                    idProduto,
+                    produto.getNomeCompleto(),
+                    quantidade,
+                    String.format("R$ %.2f", produto.getPrecoVenda()),
+                    String.format("R$ %.2f", item.getSubtotal())
+                };
+                modelProdutosSelecionados.addRow(row);
+            }
+            
+            double total = produtosSelecionados.stream().mapToDouble(InstalacaoProduto::getSubtotal).sum();
+            txtValorOrcamento.setText(String.format("%.2f", total));
+        });
+        
+        btnRemover.addActionListener(e -> {
+            int row = tabelaProdutosSelecionados.getSelectedRow();
+            if (row >= 0) {
+                int idProduto = (int) modelProdutosSelecionados.getValueAt(row, 0);
+                produtosSelecionados.removeIf(ip -> ip.getIdProduto() == idProduto);
+                modelProdutosSelecionados.removeRow(row);
+                
+                double total = produtosSelecionados.stream().mapToDouble(InstalacaoProduto::getSubtotal).sum();
+                txtValorOrcamento.setText(String.format("%.2f", total));
+            }
+        });
+        
+        panel.add(panelTopo, BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(panelBotoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelNovoOrcamento() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JPanel panelCliente = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelCliente.add(new JLabel("Cliente:*"), gbc);
+        comboClienteOrcamento = new JComboBox<>();
+        comboClienteOrcamento.setPreferredSize(new Dimension(300, 25));
+        gbc.gridx = 1;
+        panelCliente.add(comboClienteOrcamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panelCliente.add(new JLabel("Valor Total (R$):*"), gbc);
+        txtValorOrcamento = new JTextField(15);
+        txtValorOrcamento.setEditable(false);
+        txtValorOrcamento.setText("0,00");
+        gbc.gridx = 1;
+        panelCliente.add(txtValorOrcamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelCliente.add(new JLabel("Descrição Resumida:*"), gbc);
+        txtDescricaoOrcamento = new JTextField(40);
+        gbc.gridx = 1;
+        panelCliente.add(txtDescricaoOrcamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panelCliente.add(new JLabel("Endereço da Instalação:"), gbc);
+        txtEnderecoInstalacao = new JTextField(40);
+        gbc.gridx = 1;
+        panelCliente.add(txtEnderecoInstalacao, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        panelCliente.add(new JLabel("Data Agendamento:"), gbc);
+        txtDataAgendamento = new JTextField(15);
+        txtDataAgendamento.setToolTipText("dd/MM/yyyy");
+        gbc.gridx = 1;
+        panelCliente.add(txtDataAgendamento, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        panelCliente.add(new JLabel("Detalhes do Orçamento:"), gbc);
+        txtDetalhesOrcamento = new JTextArea(4, 40);
+        txtDetalhesOrcamento.setLineWrap(true);
+        JScrollPane scrollDetalhes = new JScrollPane(txtDetalhesOrcamento);
+        gbc.gridx = 1;
+        panelCliente.add(scrollDetalhes, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 6;
+        panelCliente.add(new JLabel("Observações:"), gbc);
+        txtObservacoes = new JTextArea(3, 40);
+        txtObservacoes.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObservacoes);
+        gbc.gridx = 1;
+        panelCliente.add(scrollObs, gbc);
+        
+        JPanel panelProdutos = criarPainelSelecaoProdutos();
+        
+        JButton btnGerar = new JButton("Gerar Orçamento");
+        btnGerar.setFont(new Font("Arial", Font.BOLD, 14));
+        btnGerar.addActionListener(e -> gerarOrcamento());
+        
+        JPanel panelBotoes = new JPanel();
+        panelBotoes.add(btnGerar);
+        
+        panel.add(panelCliente, BorderLayout.NORTH);
+        panel.add(panelProdutos, BorderLayout.CENTER);
+        panel.add(panelBotoes, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private JPanel criarPainelAprovarOrcamento() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        String[] colunas = {"ID", "Cliente", "Valor (R$)", "Data", "Descrição"};
+        DefaultTableModel modelPendentes = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        JTable tabelaPendentes = new JTable(modelPendentes);
+        
+        carregarOrcamentosPendentes(modelPendentes);
+        
+        JButton btnAprovar = new JButton("Aprovar Orçamento e Gerar Ordem de Instalação");
+        btnAprovar.addActionListener(e -> {
+            int row = tabelaPendentes.getSelectedRow();
+            if (row >= 0) {
+                int idOrcamento = (int) modelPendentes.getValueAt(row, 0);
+                double valor = (double) modelPendentes.getValueAt(row, 2);
+                
+                aprovarOrcamento(idOrcamento, valor);
+                
+                modelPendentes.setRowCount(0);
+                carregarOrcamentosPendentes(modelPendentes);
+            } else {
+                JOptionPane.showMessageDialog(panel, "Selecione um orçamento para aprovar!");
+            }
+        });
+        
+        panel.add(new JScrollPane(tabelaPendentes), BorderLayout.CENTER);
+        panel.add(btnAprovar, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void carregarOrcamentosPendentes(DefaultTableModel model) {
+        List<Atendimento> orcamentos = atendimentoDAO.listarPorTipo("ORCAMENTO");
+        orcamentos = orcamentos.stream()
+            .filter(a -> "PENDENTE".equals(a.getStatus()))
+            .toList();
+        
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        for (Atendimento a : orcamentos) {
+            Cliente c = clienteDAO.buscarPorId(a.getIdCliente());
+            if (c != null) {
+                Object[] row = {
+                    a.getId(),
+                    c.getNomeExibicao(),
+                    extrairValorOrcamento(a.getDescricao()),
+                    sdf.format(a.getDataAbertura()),
+                    a.getAssunto()
+                };
+                model.addRow(row);
+            }
+        }
+    }
+    
+    private void carregarClientesCombos() {
+        comboClienteOrcamento.removeAllItems();
+        
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            String item = c.getId() + " - " + c.getNomeExibicao();
+            comboClienteOrcamento.addItem(item);
+        }
+    }
+    
+    private void carregarOrcamentos() {
+        modelOrcamentos.setRowCount(0);
+        List<Atendimento> orcamentos = atendimentoDAO.listarPorTipo("ORCAMENTO");
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (Atendimento a : orcamentos) {
+            Cliente c = clienteDAO.buscarPorId(a.getIdCliente());
+            if (c != null) {
+                Object[] row = {
+                    a.getId(),
+                    c.getNomeExibicao(),
+                    extrairValorOrcamento(a.getDescricao()),
+                    a.getStatus(),
+                    sdf.format(a.getDataAbertura()),
+                    a.getAssunto()
+                };
+                modelOrcamentos.addRow(row);
+            }
+        }
+    }
+    
+    private void carregarOrdensInstalacao() {
+        modelInstalacoes.setRowCount(0);
+        // AGORA BUSCA DO ORDEMSERVICODAO
+        List<OrdemServico> instalacoes = ordemServicoDAO.listarOrdensInstalacao();
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        
+        for (OrdemServico os : instalacoes) {
+            Cliente c = clienteDAO.buscarPorId(os.getIdCliente());
+            if (c != null) {
+                Object[] row = {
+                    os.getId(),
+                    c.getNomeExibicao(),
+                    String.format("R$ %.2f", os.getValorTotal()),
+                    os.getStatus(),
+                    os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                    os.getDataFechamento() != null ? sdf.format(os.getDataFechamento()) : "",
+                    os.getDataAgendamento() != null ? os.getDataAgendamento() : "---"
+                };
+                modelInstalacoes.addRow(row);
+            }
+        }
+    }
+    
+    private double extrairValorOrcamento(String descricao) {
+        if (descricao != null) {
+            int idx = descricao.indexOf("VALOR TOTAL: R$ ");
+            if (idx >= 0) {
+                try {
+                    String valorStr = descricao.substring(idx + 15);
+                    int endIdx = valorStr.indexOf("\n");
+                    if (endIdx > 0) {
+                        valorStr = valorStr.substring(0, endIdx);
+                    }
+                    valorStr = valorStr.replace(",", ".").trim();
+                    return Double.parseDouble(valorStr);
+                } catch (Exception e) {
+                    // Ignorar
+                }
+            }
+        }
+        return 0;
+    }
+    
+    private void gerarOrcamento() {
+        if (comboClienteOrcamento.getSelectedIndex() == -1) {
+            JOptionPane.showMessageDialog(this, "Selecione um cliente!");
+            return;
+        }
+        
+        String valorStr = txtValorOrcamento.getText().trim().replace(",", ".");
+        double valor;
+        try {
+            valor = Double.parseDouble(valorStr);
+            if (valor <= 0) {
+                JOptionPane.showMessageDialog(this, "Adicione pelo menos um produto ao orçamento!");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Valor inválido!");
+            return;
+        }
+        
+        String descricaoResumida = txtDescricaoOrcamento.getText().trim();
+        if (descricaoResumida.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Descrição resumida é obrigatória!");
+            return;
+        }
+        
+        String detalhes = txtDetalhesOrcamento.getText().trim();
+        
+        StringBuilder sbDescricao = new StringBuilder();
+        sbDescricao.append("VALOR TOTAL: R$ ").append(String.format("%.2f", valor)).append("\n");
+        sbDescricao.append("DESCRIÇÃO: ").append(descricaoResumida).append("\n");
+        sbDescricao.append("PRODUTOS:\n");
+        for (InstalacaoProduto item : produtosSelecionados) {
+            ProdutoEstoque produto = produtoEstoqueDAO.buscarPorId(item.getIdProduto());
+            if (produto != null) {
+                sbDescricao.append("- ").append(produto.getNomeCompleto())
+                         .append(": ").append(item.getQuantidade()).append(" x R$ ")
+                         .append(String.format("%.2f", item.getPrecoUnitario()))
+                         .append(" = R$ ").append(String.format("%.2f", item.getSubtotal())).append("\n");
+            }
+        }
+        if (!detalhes.isEmpty()) {
+            sbDescricao.append("OBSERVAÇÕES: ").append(detalhes).append("\n");
+        }
+        
+        String selected = (String) comboClienteOrcamento.getSelectedItem();
+        int idCliente = Integer.parseInt(selected.split(" - ")[0]);
+        
+        Atendimento orcamento = new Atendimento();
+        orcamento.setIdCliente(idCliente);
+        orcamento.setTipo("ORCAMENTO");
+        orcamento.setAssunto("Orçamento - " + descricaoResumida);
+        orcamento.setDescricao(sbDescricao.toString());
+        orcamento.setPrioridade("MEDIA");
+        orcamento.setIdUsuarioAbertura(usuarioLogado.getId());
+        
+        if (atendimentoDAO.inserir(orcamento)) {
+            for (InstalacaoProduto item : produtosSelecionados) {
+                item.setIdOrdemInstalacao(orcamento.getId());
+                instalacaoProdutoDAO.inserir(item);
+            }
+            
+            JOptionPane.showMessageDialog(this, "Orçamento gerado com sucesso!\nID: " + orcamento.getId());
+            
+            txtValorOrcamento.setText("0,00");
+            txtDescricaoOrcamento.setText("");
+            txtDetalhesOrcamento.setText("");
+            txtEnderecoInstalacao.setText("");
+            txtDataAgendamento.setText("");
+            txtObservacoes.setText("");
+            produtosSelecionados.clear();
+            modelProdutosSelecionados.setRowCount(0);
+            
+            carregarOrcamentos();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao gerar orçamento!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void aprovarOrcamento(int idOrcamento, double valor) {
+        Atendimento orcamento = atendimentoDAO.buscarPorId(idOrcamento);
+        if (orcamento == null) return;
+        
+        List<InstalacaoProduto> produtosOrcamento = instalacaoProdutoDAO.listarPorOrdemInstalacao(idOrcamento);
+        
+        Cliente cliente = clienteDAO.buscarPorId(orcamento.getIdCliente());
+        if (cliente == null) return;
+        
+        for (InstalacaoProduto item : produtosOrcamento) {
+            ProdutoEstoque produto = produtoEstoqueDAO.buscarPorId(item.getIdProduto());
+            if (produto == null || produto.getQuantidade() < item.getQuantidade()) {
+                JOptionPane.showMessageDialog(this,
+                    "Estoque insuficiente para o produto: " + (produto != null ? produto.getNomeCompleto() : "ID: " + item.getIdProduto()) + "\n" +
+                    "Disponível: " + (produto != null ? produto.getQuantidade() : 0) + 
+                    "\nSolicitado: " + item.getQuantidade(),
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+        
+        // Dialog para informações adicionais da instalação
+        JPanel panelInfo = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panelInfo.add(new JLabel("Endereço da Instalação:"), gbc);
+        JTextField txtEndereco = new JTextField(cliente.getLogradouro() + ", " + cliente.getNumero() + " - " + cliente.getBairro(), 40);
+        gbc.gridx = 1;
+        panelInfo.add(txtEndereco, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panelInfo.add(new JLabel("Data Agendamento (dd/MM/yyyy):"), gbc);
+        JTextField txtDataAgend = new JTextField(15);
+        gbc.gridx = 1;
+        panelInfo.add(txtDataAgend, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panelInfo.add(new JLabel("Observações:"), gbc);
+        JTextArea txtObs = new JTextArea(3, 40);
+        txtObs.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObs);
+        gbc.gridx = 1;
+        panelInfo.add(scrollObs, gbc);
+        
+        int confirm = JOptionPane.showConfirmDialog(this, panelInfo,
+            "Aprovar Orçamento - Informações da Instalação", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (confirm != JOptionPane.OK_OPTION) return;
+        
+        // Dar baixa no estoque
+        for (InstalacaoProduto item : produtosOrcamento) {
+            boolean baixaOk = produtoEstoqueDAO.darBaixaEstoque(
+                item.getIdProduto(), 
+                item.getQuantidade(), 
+                "INSTALACAO", 
+                idOrcamento,
+                usuarioLogado.getId()
+            );
+            
+            if (!baixaOk) {
+                JOptionPane.showMessageDialog(this, "Erro ao dar baixa no estoque do produto ID: " + item.getIdProduto(),
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+        
+        // Criar Ordem de Instalação usando OrdemServico
+        OrdemServico osInstalacao = new OrdemServico();
+        osInstalacao.setIdCliente(cliente.getId());
+        osInstalacao.setTipoOrdem("INSTALACAO");  // Marcar como ordem de instalação
+        osInstalacao.setTipoNivel("3º Nível");
+        osInstalacao.setStatus("ABERTA");
+        osInstalacao.setMotivo("INSTALAÇÃO - Orçamento #" + idOrcamento + " - " + orcamento.getAssunto());
+        osInstalacao.setValorTotal(valor);
+        osInstalacao.setEnderecoInstalacao(txtEndereco.getText().trim());
+        osInstalacao.setDataAgendamento(txtDataAgend.getText().trim());
+        osInstalacao.setObservacoes(txtObs.getText().trim());
+        osInstalacao.setIdAtendimentoOrigem(idOrcamento);
+        osInstalacao.setDataAbertura(new Date());
+        osInstalacao.setIdUsuarioAbertura(usuarioLogado.getId());
+        
+        // Construir string de produtos instalados
+        StringBuilder sbProdutos = new StringBuilder();
+        for (InstalacaoProduto item : produtosOrcamento) {
+            ProdutoEstoque produto = produtoEstoqueDAO.buscarPorId(item.getIdProduto());
+            if (produto != null) {
+                sbProdutos.append(String.format("- %s: %d x R$ %.2f = R$ %.2f\n", 
+                    produto.getNomeCompleto(), item.getQuantidade(), 
+                    item.getPrecoUnitario(), item.getSubtotal()));
+            }
+        }
+        osInstalacao.setProdutosInstalados(sbProdutos.toString());
+        
+        if (ordemServicoDAO.inserir(osInstalacao)) {
+            // Atualizar o orçamento como concluído
+            orcamento.setStatus("CONCLUIDO");
+            orcamento.setDataConclusao(new Date());
+            orcamento.setIdUsuarioAtendimento(usuarioLogado.getId());
+            orcamento.setIdOrdemServicoVinculada(osInstalacao.getId());
+            atendimentoDAO.atualizar(orcamento);
+            
+            // Registrar transação financeira
+            TransacaoFinanceira transacao = new TransacaoFinanceira();
+            transacao.setTipo("ENTRADA");
+            transacao.setNatureza("Instalação");
+            transacao.setFormaPagamento("A_DEFINIR");
+            transacao.setValor(valor);
+            transacao.setDescricao("Instalação - Orçamento #" + idOrcamento + " - Cliente: " + cliente.getNomeExibicao());
+            transacao.setStatus("PENDENTE");
+            transacao.setIdCliente(cliente.getId());
+            transacao.setIdOrdemServico(osInstalacao.getId());
+            transacao.setIdUsuarioRegistro(usuarioLogado.getId());
+            transacaoDAO.inserir(transacao);
+            
+            JOptionPane.showMessageDialog(this,
+                "Orçamento aprovado!\n\n" +
+                "Ordem de Instalação #" + osInstalacao.getId() + " criada.\n" +
+                "Produtos baixados do estoque.\n" +
+                "Transação financeira registrada (PENDENTE).\n\n" +
+                "Agora o técnico deve realizar a instalação e concluir a ordem.",
+                "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+            
+            carregarOrdensInstalacao();
+            carregarOrcamentos();
+        } else {
+            JOptionPane.showMessageDialog(this, "Erro ao criar Ordem de Instalação!", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void recusarOrcamento() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um orçamento para recusar!");
+            return;
+        }
+        
+        int id = (int) modelOrcamentos.getValueAt(row, 0);
+        String status = (String) modelOrcamentos.getValueAt(row, 3);
+        
+        if (!"PENDENTE".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Este orçamento não está pendente!");
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Deseja recusar este orçamento?", 
+            "Recusar Orçamento", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            Atendimento a = atendimentoDAO.buscarPorId(id);
+            if (a != null) {
+                a.setStatus("CANCELADO");
+                a.setDataConclusao(new Date());
+                a.setIdUsuarioAtendimento(usuarioLogado.getId());
+                if (atendimentoDAO.atualizar(a)) {
+                    JOptionPane.showMessageDialog(this, "Orçamento recusado!");
+                    carregarOrcamentos();
+                }
+            }
+        }
+    }
+    
+    private void concluirInstalacao() {
+        int row = tabelaInstalacoes.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione uma ordem de instalação para concluir!");
+            return;
+        }
+        
+        int id = (int) modelInstalacoes.getValueAt(row, 0);
+        String status = (String) modelInstalacoes.getValueAt(row, 3);
+        
+        if (!"ABERTA".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Esta instalação já foi concluída!");
+            return;
+        }
+        
+        OrdemServico os = ordemServicoDAO.buscarPorId(id);
+        if (os == null) return;
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Observações da Instalação:"), gbc);
+        JTextArea txtObsFinal = new JTextArea(5, 40);
+        txtObsFinal.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObsFinal);
+        gbc.gridy = 1;
+        panel.add(scrollObs, gbc);
+        
+        int confirm = JOptionPane.showConfirmDialog(this, panel,
+            "Concluir Instalação - OS #" + id, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (confirm == JOptionPane.OK_OPTION) {
+            String observacoes = txtObsFinal.getText().trim();
+            if (observacoes.isEmpty()) {
+                observacoes = "Instalação concluída com sucesso.";
+            }
+            
+            if (ordemServicoDAO.concluirInstalacao(id, observacoes, usuarioLogado.getId())) {
+                JOptionPane.showMessageDialog(this, "Instalação concluída com sucesso!\nOS #" + id + " finalizada.");
+                carregarOrdensInstalacao();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao concluir instalação!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void agendarInstalacao() {
+        int row = tabelaInstalacoes.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione uma ordem de instalação para agendar!");
+            return;
+        }
+        
+        int id = (int) modelInstalacoes.getValueAt(row, 0);
+        OrdemServico os = ordemServicoDAO.buscarPorId(id);
+        if (os == null) return;
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Data Agendamento (dd/MM/yyyy):"), gbc);
+        JTextField txtNovaData = new JTextField(os.getDataAgendamento() != null ? os.getDataAgendamento() : "", 15);
+        gbc.gridx = 1;
+        panel.add(txtNovaData, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Observações:"), gbc);
+        JTextArea txtObs = new JTextArea(3, 40);
+        txtObs.setLineWrap(true);
+        JScrollPane scrollObs = new JScrollPane(txtObs);
+        gbc.gridx = 1;
+        panel.add(scrollObs, gbc);
+        
+        int confirm = JOptionPane.showConfirmDialog(this, panel,
+            "Agendar Instalação - OS #" + id, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (confirm == JOptionPane.OK_OPTION) {
+            String novaData = txtNovaData.getText().trim();
+            if (!novaData.isEmpty()) {
+                os.setDataAgendamento(novaData);
+            }
+            String observacoes = txtObs.getText().trim();
+            if (!observacoes.isEmpty()) {
+                String obsAtual = os.getObservacoes();
+                os.setObservacoes((obsAtual != null ? obsAtual + "\n" : "") + "AGENDAMENTO: " + observacoes);
+            }
+            
+            if (ordemServicoDAO.atualizar(os)) {
+                JOptionPane.showMessageDialog(this, "Instalação agendada com sucesso!\nData: " + novaData);
+                carregarOrdensInstalacao();
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao agendar instalação!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void verDetalhesOrcamento() {
+        int row = tabelaOrcamentos.getSelectedRow();
+        if (row < 0) return;
+        
+        int id = (int) modelOrcamentos.getValueAt(row, 0);
+        Atendimento a = atendimentoDAO.buscarPorId(id);
+        
+        if (a != null) {
+            JTextArea textArea = new JTextArea(20, 60);
+            textArea.setText("=== DETALHES DO ORÇAMENTO ===\n\n");
+            textArea.append("ID: " + a.getId() + "\n");
+            textArea.append("Cliente: " + modelOrcamentos.getValueAt(row, 1) + "\n");
+            textArea.append("Valor: " + modelOrcamentos.getValueAt(row, 2) + "\n");
+            textArea.append("Status: " + a.getStatus() + "\n");
+            textArea.append("Data: " + modelOrcamentos.getValueAt(row, 4) + "\n");
+            textArea.append("Descrição: " + a.getAssunto() + "\n\n");
+            textArea.append("--- DETALHES COMPLETOS ---\n");
+            textArea.append(a.getDescricao());
+            
+            List<InstalacaoProduto> produtos = instalacaoProdutoDAO.listarPorOrdemInstalacao(id);
+            if (!produtos.isEmpty()) {
+                textArea.append("\n\n--- PRODUTOS DO ORÇAMENTO ---\n");
+                for (InstalacaoProduto item : produtos) {
+                    ProdutoEstoque p = produtoEstoqueDAO.buscarPorId(item.getIdProduto());
+                    if (p != null) {
+                        textArea.append(String.format("- %s: %d x R$ %.2f = R$ %.2f\n", 
+                            p.getNomeCompleto(), item.getQuantidade(), 
+                            item.getPrecoUnitario(), item.getSubtotal()));
+                    }
+                }
+            }
+            
+            textArea.setEditable(false);
+            
+            JOptionPane.showMessageDialog(this, new JScrollPane(textArea), 
+                "Detalhes do Orçamento", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+    
+    private void verDetalhesInstalacao() {
+        int row = tabelaInstalacoes.getSelectedRow();
+        if (row < 0) return;
+        
+        int id = (int) modelInstalacoes.getValueAt(row, 0);
+        OrdemServico os = ordemServicoDAO.buscarPorId(id);
+        
+        if (os != null) {
+            Cliente cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            
+            JTextArea textArea = new JTextArea(20, 60);
+            textArea.setText("=== DETALHES DA ORDEM DE INSTALAÇÃO ===\n\n");
+            textArea.append("ID: " + os.getId() + "\n");
+            textArea.append("Cliente: " + (cliente != null ? cliente.getNomeExibicao() : "N/A") + "\n");
+            textArea.append("Valor: " + String.format("R$ %.2f", os.getValorTotal()) + "\n");
+            textArea.append("Status: " + os.getStatus() + "\n");
+            textArea.append("Data Abertura: " + (os.getDataAbertura() != null ? new SimpleDateFormat("dd/MM/yyyy HH:mm").format(os.getDataAbertura()) : "") + "\n");
+            textArea.append("Data Conclusão: " + (os.getDataFechamento() != null ? new SimpleDateFormat("dd/MM/yyyy HH:mm").format(os.getDataFechamento()) : "---") + "\n");
+            textArea.append("Data Agendamento: " + (os.getDataAgendamento() != null ? os.getDataAgendamento() : "---") + "\n");
+            textArea.append("Endereço: " + (os.getEnderecoInstalacao() != null ? os.getEnderecoInstalacao() : "---") + "\n\n");
+            textArea.append("--- MOTIVO ---\n");
+            textArea.append(os.getMotivo() != null ? os.getMotivo() : "---\n\n");
+            textArea.append("--- PRODUTOS INSTALADOS ---\n");
+            textArea.append(os.getProdutosInstalados() != null ? os.getProdutosInstalados() : "---\n\n");
+            textArea.append("--- OBSERVAÇÕES ---\n");
+            textArea.append(os.getObservacoes() != null ? os.getObservacoes() : "---\n");
+            
+            textArea.setEditable(false);
+            
+            JOptionPane.showMessageDialog(this, new JScrollPane(textArea), 
+                "Detalhes da Instalação", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+    
+    // Métodos para compatibilidade com TelaPrincipal
+    public void setSelectedTab(String title) {
+        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+            if (tabbedPane.getTitleAt(i).equals(title)) {
+                tabbedPane.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+    
+    public int getTabCount() {
+        return tabbedPane.getTabCount();
+    }
+}

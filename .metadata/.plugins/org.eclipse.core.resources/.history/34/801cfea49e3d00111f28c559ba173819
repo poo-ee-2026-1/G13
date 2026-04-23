@@ -1,0 +1,858 @@
+// TelaMonitoramento.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Usuario;
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.service.MonitoramentoService;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import java.util.Timer;
+
+public class TelaMonitoramento extends JPanel {
+    private JTable tabelaMonitoramento;
+    private DefaultTableModel tableModel;
+    private JLabel lblStatusConexao;
+    private Timer timerAtualizacao;
+    private MonitoramentoService monitoramentoService;
+    private OrdemServicoService ordemServicoService;
+    private Usuario usuarioLogado;
+    private boolean pausado = false;
+    
+    private int clienteSelecionadoId = -1;
+    private boolean restaurandoSelecao = false;
+    private boolean atualizandoDados = false;
+    
+    public TelaMonitoramento(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.monitoramentoService = Main.getMonitoramentoService();
+        this.ordemServicoService = Main.getOrdemServicoService();
+        
+        initComponents();
+        iniciarMonitoramento();
+        carregarClientesMonitorados();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        JPanel painelControle = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelControle.setBorder(BorderFactory.createTitledBorder("Controle"));
+        
+        JButton btnAtualizar = new JButton("Atualizar (F5)");
+        JButton btnPausar = new JButton("Pausar/Continuar (F8)");
+        JButton btnAbrirOS = new JButton("Abrir OS (F2)");
+        JButton btnFecharOS = new JButton("Fechar OS (F4)");
+        
+        lblStatusConexao = new JLabel("● CONECTADO");
+        lblStatusConexao.setFont(new Font("Arial", Font.BOLD, 12));
+        lblStatusConexao.setForeground(new Color(0, 100, 0));
+        
+        btnAtualizar.addActionListener(e -> carregarClientesMonitorados());
+        btnPausar.addActionListener(e -> togglePausa());
+        btnAbrirOS.addActionListener(e -> abrirOSManual());
+        btnFecharOS.addActionListener(e -> fecharOSManual());
+        
+        painelControle.add(btnAtualizar);
+        painelControle.add(btnPausar);
+        painelControle.add(btnAbrirOS);
+        painelControle.add(btnFecharOS);
+        painelControle.add(Box.createHorizontalStrut(20));
+        painelControle.add(lblStatusConexao);
+        
+        String[] colunas = {"ID_CLIENTE", "CLIENTE", "EQUIPAMENTO", "ESTADO DA REDE", "TENSÃO (V)", 
+                           "MAIOR TENSÃO (V)", "MENOR TENSÃO (V)", "SITUAÇÃO DA REDE", 
+                           "DISPONIBILIDADE"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaMonitoramento = new JTable(tableModel);
+        tabelaMonitoramento.setRowHeight(30);
+        tabelaMonitoramento.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        TableColumnModel columnModel = tabelaMonitoramento.getColumnModel();
+        
+        columnModel.getColumn(0).setMinWidth(0);
+        columnModel.getColumn(0).setMaxWidth(0);
+        columnModel.getColumn(0).setWidth(0);
+        
+        columnModel.getColumn(1).setCellRenderer(new ClienteRenderer());
+        columnModel.getColumn(2).setCellRenderer(new EquipamentoRenderer());
+        columnModel.getColumn(3).setCellRenderer(new EstadoRedeRenderer());
+        columnModel.getColumn(4).setCellRenderer(new TensaoRenderer());
+        columnModel.getColumn(5).setCellRenderer(new TensaoRenderer());
+        columnModel.getColumn(6).setCellRenderer(new TensaoRenderer());
+        columnModel.getColumn(7).setCellRenderer(new SituacaoRedeRenderer());
+        columnModel.getColumn(8).setCellRenderer(new DisponibilidadeRenderer());
+        
+        tabelaMonitoramento.getSelectionModel().addListSelectionListener(e -> {
+            if (restaurandoSelecao || atualizandoDados) return;
+            
+            if (!e.getValueIsAdjusting()) {
+                int row = tabelaMonitoramento.getSelectedRow();
+                if (row >= 0) {
+                    try {
+                        Object idObj = tableModel.getValueAt(row, 0);
+                        if (idObj instanceof Integer) {
+                            clienteSelecionadoId = (int) idObj;
+                        } else if (idObj instanceof String) {
+                            clienteSelecionadoId = Integer.parseInt((String) idObj);
+                        }
+                    } catch (Exception ex) {
+                        clienteSelecionadoId = -1;
+                    }
+                } else {
+                    if (!atualizandoDados) {
+                        clienteSelecionadoId = -1;
+                    }
+                }
+            }
+        });
+        
+        JScrollPane scrollPane = new JScrollPane(tabelaMonitoramento);
+        
+        JPanel painelInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel lblInfo = new JLabel("Atalhos: F2=Abrir OS | F4=Fechar OS | F5=Atualizar | F8=Pausar");
+        lblInfo.setFont(new Font("Arial", Font.PLAIN, 10));
+        painelInfo.add(lblInfo);
+        
+        add(painelControle, BorderLayout.NORTH);
+        add(scrollPane, BorderLayout.CENTER);
+        add(painelInfo, BorderLayout.SOUTH);
+        
+        configurarAtalhos();
+    }
+    
+    private void configurarAtalhos() {
+        InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getActionMap();
+        
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "abrirOS");
+        actionMap.put("abrirOS", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                abrirOSManual();
+            }
+        });
+        
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F4, 0), "fecharOS");
+        actionMap.put("fecharOS", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                fecharOSManual();
+            }
+        });
+        
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "atualizar");
+        actionMap.put("atualizar", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                carregarClientesMonitorados();
+            }
+        });
+        
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F8, 0), "pausar");
+        actionMap.put("pausar", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                togglePausa();
+            }
+        });
+    }
+    
+    private void iniciarMonitoramento() {
+        // Cancelar timer existente se houver
+        if (timerAtualizacao != null) {
+            timerAtualizacao.cancel();
+            timerAtualizacao = null;
+        }
+        
+        timerAtualizacao = new Timer(true); // Timer daemon
+        timerAtualizacao.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                // Verificar se está pausado
+                if (!pausado) {
+                    SwingUtilities.invokeLater(() -> carregarClientesMonitorados());
+                }
+            }
+        }, 0, 500);
+        
+        System.out.println("Timer de monitoramento iniciado");
+    }
+    
+    private void pararMonitoramento() {
+        if (timerAtualizacao != null) {
+            timerAtualizacao.cancel();
+            timerAtualizacao = null;
+            System.out.println("Timer de monitoramento parado");
+        }
+    }
+    
+    private String determinarSituacaoRede(Double tensaoMedida, double tensaoNominal) {
+        if (tensaoMedida == null) {
+            return "CRÍTICO";
+        }
+        
+        double diferenca = Math.abs(tensaoMedida - tensaoNominal);
+        
+        if (diferenca <= 1) {
+            return "NORMAL";
+        } else if (diferenca <= 3) {
+            return "ALERTA";
+        } else {
+            return "CRÍTICO";
+        }
+    }
+    
+    private void carregarClientesMonitorados() {
+        // Não carregar se estiver pausado (proteção extra)
+        if (pausado) {
+            return;
+        }
+        
+        atualizandoDados = true;
+        
+        final int idParaSelecionar = clienteSelecionadoId;
+        
+        tableModel.setRowCount(0);
+        
+        try {
+            var dadosMonitoramento = monitoramentoService.listarTodosDadosMonitoramento();
+            ClienteDAO clienteDAO = new ClienteDAO();
+            
+            for (var dados : dadosMonitoramento) {
+                var cliente = clienteDAO.buscarPorId(dados.getIdCliente());
+                if (cliente != null) {
+                    double disponibilidade = monitoramentoService.calcularDisponibilidade(dados.getIdCliente());
+                    
+                    Double tensaoMedida = dados.getUltimaMedicao();
+                    double tensaoNominal = dados.getTensaoNominal();
+                    
+                    String situacaoRede = determinarSituacaoRede(tensaoMedida, tensaoNominal);
+                    
+                    String estadoRede = dados.getEstadoRedeAtual();
+                    if (tensaoMedida == null && (estadoRede == null || "AGUARDANDO".equals(estadoRede))) {
+                        estadoRede = "SEM COMUNICAÇÃO";
+                    }
+                    
+                    Object[] row = {
+                        dados.getIdCliente(),
+                        cliente.getNomeExibicao(),
+                        dados.getEquipamento().getMarca() + " " + dados.getEquipamento().getModelo(),
+                        estadoRede != null ? estadoRede : "AGUARDANDO",
+                        tensaoMedida != null ? String.format("%.2f", tensaoMedida) : "---",
+                        dados.getMaiorTensao() != Double.MIN_VALUE ? String.format("%.2f", dados.getMaiorTensao()) : "---",
+                        dados.getMenorTensao() != Double.MAX_VALUE ? String.format("%.2f", dados.getMenorTensao()) : "---",
+                        situacaoRede,
+                        String.format("%.2f%%", disponibilidade)
+                    };
+                    tableModel.addRow(row);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao carregar clientes monitorados: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        if (tableModel.getRowCount() == 0) {
+            Object[] row = {0, "Nenhum cliente em monitoramento", "-", "-", "-", "-", "-", "-", "-"};
+            tableModel.addRow(row);
+        }
+        
+        if (idParaSelecionar > 0) {
+            restaurandoSelecao = true;
+            try {
+                int linhaEncontrada = -1;
+                for (int i = 0; i < tableModel.getRowCount(); i++) {
+                    try {
+                        Object idObj = tableModel.getValueAt(i, 0);
+                        int idAtual = -1;
+                        if (idObj instanceof Integer) {
+                            idAtual = (int) idObj;
+                        } else if (idObj instanceof String) {
+                            idAtual = Integer.parseInt((String) idObj);
+                        }
+                        
+                        if (idAtual == idParaSelecionar) {
+                            linhaEncontrada = i;
+                            break;
+                        }
+                    } catch (Exception e) {
+                        // Ignorar
+                    }
+                }
+                
+                if (linhaEncontrada >= 0) {
+                    tabelaMonitoramento.setRowSelectionInterval(linhaEncontrada, linhaEncontrada);
+                } else {
+                    clienteSelecionadoId = -1;
+                }
+            } finally {
+                restaurandoSelecao = false;
+            }
+        }
+        
+        atualizandoDados = false;
+        tabelaMonitoramento.repaint();
+    }
+    
+    private void togglePausa() {
+        // Alternar estado de pausa
+        pausado = !pausado;
+        
+        // Atualizar o serviço de monitoramento para suspender/reativar OS automáticas
+        if (monitoramentoService != null) {
+            monitoramentoService.setPausado(pausado);
+        }
+        
+        // Atualizar o texto e cor do status
+        if (pausado) {
+            lblStatusConexao.setText("● PAUSADO");
+            lblStatusConexao.setForeground(Color.ORANGE);
+            
+            // Forçar uma atualização final antes de pausar
+            carregarClientesMonitorados();
+            
+            JOptionPane.showMessageDialog(this, 
+                "▶ Monitoramento PAUSADO!\n\n" +
+                "Durante a pausa:\n" +
+                "• A tela NÃO será atualizada automaticamente\n" +
+                "• Nenhuma OS AUTOMÁTICA será aberta\n" +
+                "• OS MANUAIS continuam disponíveis (F2)\n" +
+                "• Pressione F8 novamente para CONTINUAR", 
+                "Monitoramento Pausado", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            lblStatusConexao.setText("● CONECTADO");
+            lblStatusConexao.setForeground(new Color(0, 100, 0));
+            
+            // Forçar uma atualização imediata ao retomar
+            carregarClientesMonitorados();
+            
+            JOptionPane.showMessageDialog(this, 
+                "▶ Monitoramento RETOMADO!\n\n" +
+                "As atualizações automáticas e aberturas automáticas de OS foram reativadas.\n" +
+                "Pressione F8 novamente para pausar.", 
+                "Monitoramento Retomado", JOptionPane.INFORMATION_MESSAGE);
+        }
+        
+        System.out.println("Toggle pausa: pausado = " + pausado);
+    }
+    
+    private int getIdClienteSelecionado() {
+        if (clienteSelecionadoId > 0) {
+            return clienteSelecionadoId;
+        }
+        
+        int row = tabelaMonitoramento.getSelectedRow();
+        if (row >= 0) {
+            try {
+                Object idObj = tableModel.getValueAt(row, 0);
+                if (idObj instanceof Integer) {
+                    clienteSelecionadoId = (int) idObj;
+                    return clienteSelecionadoId;
+                } else if (idObj instanceof String) {
+                    clienteSelecionadoId = Integer.parseInt((String) idObj);
+                    return clienteSelecionadoId;
+                }
+            } catch (Exception e) {
+                System.err.println("Erro ao extrair ID do cliente: " + e.getMessage());
+            }
+        }
+        return -1;
+    }
+    
+    private String getNomeClienteSelecionado() {
+        int row = tabelaMonitoramento.getSelectedRow();
+        if (row >= 0) {
+            Object nomeObj = tableModel.getValueAt(row, 1);
+            if (nomeObj != null) {
+                return nomeObj.toString();
+            }
+        }
+        return null;
+    }
+    
+    private void abrirOSManual() {
+        // OS MANUAIS continuam disponíveis mesmo com monitoramento pausado
+        if (ordemServicoService == null) {
+            JOptionPane.showMessageDialog(this, "Serviço de OS não disponível!");
+            return;
+        }
+        
+        int idCliente = getIdClienteSelecionado();
+        String nomeCliente = getNomeClienteSelecionado();
+        
+        // Verificar se há clientes em monitoramento
+        if (tableModel.getRowCount() == 1 && "Nenhum cliente em monitoramento".equals(tableModel.getValueAt(0, 1))) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Não há clientes em monitoramento!\n\n" +
+                "Para monitorar um cliente:\n" +
+                "1. Acesse o menu Cadastros > Clientes\n" +
+                "2. Selecione um cliente e marque a opção 'Em Monitoramento'\n" +
+                "3. Certifique-se de que o cliente possui um equipamento cadastrado", 
+                "Nenhum Cliente Monitorado", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (idCliente <= 0) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Nenhum cliente selecionado!\n\n" +
+                "Para abrir uma OS, clique em um cliente na tabela primeiro.", 
+                "Selecione um Cliente", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // VERIFICAÇÃO: Cliente já possui OS aberta?
+        if (ordemServicoService.clientePossuiOSAberta(idCliente)) {
+            OrdemServico osExistente = ordemServicoService.getOSAbertaPorCliente(idCliente);
+            String msg = "❌ NÃO FOI POSSÍVEL ABRIR UMA NOVA OS!\n\n" +
+                         "O cliente " + nomeCliente + " já possui uma Ordem de Serviço aberta.\n\n" +
+                         "📋 Detalhes da OS existente:\n" +
+                         "• Número: #" + (osExistente != null ? osExistente.getId() : "?") + "\n" +
+                         "• Tipo: " + (osExistente != null ? osExistente.getTipoOs() : "REPARO") + "\n" +
+                         "• Status: " + (osExistente != null ? osExistente.getStatus() : "ABERTA") + "\n" +
+                         "• Data Abertura: " + (osExistente != null && osExistente.getDataAbertura() != null ? 
+                             new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(osExistente.getDataAbertura()) : "---") + "\n\n" +
+                         "Para abrir uma nova OS, primeiro feche a OS existente:\n" +
+                         "1. Selecione o cliente na tabela\n" +
+                         "2. Pressione F4 ou clique em 'Fechar OS'\n" +
+                         "3. Após fechar, tente abrir uma nova OS novamente.";
+            
+            JOptionPane.showMessageDialog(this, msg, "OS Existente", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (nomeCliente == null || nomeCliente.isEmpty()) {
+            ClienteDAO clienteDAO = new ClienteDAO();
+            var cliente = clienteDAO.buscarPorId(idCliente);
+            nomeCliente = cliente != null ? cliente.getNomeExibicao() : "Cliente ID: " + idCliente;
+        }
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Cliente:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(nomeCliente), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Motivo da OS:*"), gbc);
+        JTextArea txtMotivo = new JTextArea(4, 35);
+        txtMotivo.setLineWrap(true);
+        JScrollPane scrollMotivo = new JScrollPane(txtMotivo);
+        gbc.gridx = 1;
+        panel.add(scrollMotivo, gbc);
+        
+        JLabel lblInfo = new JLabel("Esta OS será do tipo REPARO (Suporte Técnico)", SwingConstants.CENTER);
+        lblInfo.setFont(new Font("Arial", Font.ITALIC, 11));
+        lblInfo.setForeground(Color.BLUE);
+        gbc.gridy = 2;
+        panel.add(lblInfo, gbc);
+        
+        // Adicionar aviso se o monitoramento estiver pausado (apenas informativo)
+        if (pausado) {
+            JLabel lblAvisoPausa = new JLabel("⚠️ Monitoramento está PAUSADO - Apenas OS manual", SwingConstants.CENTER);
+            lblAvisoPausa.setFont(new Font("Arial", Font.ITALIC, 10));
+            lblAvisoPausa.setForeground(Color.ORANGE);
+            gbc.gridy = 3;
+            panel.add(lblAvisoPausa, gbc);
+        }
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Abrir Ordem de Serviço (REPARO)", 
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            String motivo = txtMotivo.getText().trim();
+            if (motivo.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Informe o motivo da OS!");
+                return;
+            }
+            
+            // Verificar novamente antes de criar (pode ter mudado enquanto o usuário digitava)
+            if (ordemServicoService.clientePossuiOSAberta(idCliente)) {
+                JOptionPane.showMessageDialog(this, 
+                    "❌ Não foi possível abrir a OS!\n\n" +
+                    "O cliente " + nomeCliente + " acabou de receber uma OS aberta.\n" +
+                    "Feche a OS existente antes de tentar novamente.", 
+                    "OS Existente", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            
+            var os = ordemServicoService.abrirOrdemServicoManual(idCliente, motivo, usuarioLogado.getId());
+            if (os != null) {
+                String mensagem = "✅ OS #" + os.getId() + " (REPARO) aberta com sucesso!\n\n" +
+                                  "Cliente: " + nomeCliente + "\n" +
+                                  "Motivo: " + motivo;
+                if (pausado) {
+                    mensagem += "\n\n⚠️ Observação: O monitoramento está pausado, mas a OS foi aberta normalmente.";
+                }
+                JOptionPane.showMessageDialog(this, mensagem);
+                carregarClientesMonitorados();
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "❌ Erro ao abrir OS!\n\n" +
+                    "Verifique se o cliente já não possui uma OS aberta.", 
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void fecharOSManual() {
+        // OS MANUAIS continuam disponíveis mesmo com monitoramento pausado
+        if (ordemServicoService == null) {
+            JOptionPane.showMessageDialog(this, "Serviço de OS não disponível!");
+            return;
+        }
+        
+        int idCliente = getIdClienteSelecionado();
+        String nomeCliente = getNomeClienteSelecionado();
+        
+        if (tableModel.getRowCount() == 1 && "Nenhum cliente em monitoramento".equals(tableModel.getValueAt(0, 1))) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Não há clientes em monitoramento!\n\n" +
+                "Para fechar uma OS, é necessário ter clientes monitorados.", 
+                "Nenhum Cliente Monitorado", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (idCliente <= 0) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Nenhum cliente selecionado!\n\n" +
+                "Para fechar uma OS, clique em um cliente na tabela primeiro.", 
+                "Selecione um Cliente", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        if (nomeCliente == null || nomeCliente.isEmpty()) {
+            ClienteDAO clienteDAO = new ClienteDAO();
+            var cliente = clienteDAO.buscarPorId(idCliente);
+            nomeCliente = cliente != null ? cliente.getNomeExibicao() : "Cliente ID: " + idCliente;
+        }
+        
+        // Buscar OS aberta do cliente
+        OrdemServico osCliente = ordemServicoService.getOSAbertaPorCliente(idCliente);
+        
+        if (osCliente == null) {
+            JOptionPane.showMessageDialog(this, 
+                "❌ Não há OS aberta para este cliente!\n\n" +
+                "Cliente: " + nomeCliente, 
+                "Nenhuma OS Aberta", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("OS #:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(String.valueOf(osCliente.getId())), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Cliente:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(nomeCliente), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Motivo original:"), gbc);
+        JTextArea txtMotivoOriginal = new JTextArea(3, 35);
+        txtMotivoOriginal.setText(osCliente.getMotivo());
+        txtMotivoOriginal.setEditable(false);
+        txtMotivoOriginal.setBackground(new Color(240, 240, 240));
+        txtMotivoOriginal.setLineWrap(true);
+        JScrollPane scrollMotivo = new JScrollPane(txtMotivoOriginal);
+        gbc.gridx = 1;
+        panel.add(scrollMotivo, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(new JLabel("Descrição da Solução:*"), gbc);
+        JTextArea txtSolucao = new JTextArea(5, 35);
+        txtSolucao.setLineWrap(true);
+        JScrollPane scrollSolucao = new JScrollPane(txtSolucao);
+        gbc.gridx = 1;
+        panel.add(scrollSolucao, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        panel.add(new JLabel("Falha Identificada:*"), gbc);
+        JComboBox<String> comboFalha = new JComboBox<>(new String[]{
+            "CLIENTE", "MONITORAMENTO", "INSTALAÇÃO", "HARDWARE", "SOFTWARE", "REDE", "ENERGIA", "OUTRO"
+        });
+        gbc.gridx = 1;
+        panel.add(comboFalha, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        panel.add(new JLabel("Nível de dificuldade:"), gbc);
+        JComboBox<String> comboDificuldade = new JComboBox<>(new String[]{"BAIXA", "MÉDIA", "ALTA", "CRÍTICA"});
+        gbc.gridx = 1;
+        panel.add(comboDificuldade, gbc);
+        
+        // Adicionar aviso se o monitoramento estiver pausado (apenas informativo)
+        if (pausado) {
+            JLabel lblAvisoPausa = new JLabel("⚠️ Monitoramento está PAUSADO - Apenas OS manual", SwingConstants.CENTER);
+            lblAvisoPausa.setFont(new Font("Arial", Font.ITALIC, 10));
+            lblAvisoPausa.setForeground(Color.ORANGE);
+            gbc.gridy = 6;
+            panel.add(lblAvisoPausa, gbc);
+        }
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Fechar Ordem de Serviço #" + osCliente.getId(), 
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            String solucao = txtSolucao.getText().trim();
+            if (solucao.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Descrição da solução é obrigatória!");
+                return;
+            }
+            
+            String falha = (String) comboFalha.getSelectedItem();
+            String dificuldade = (String) comboDificuldade.getSelectedItem();
+            
+            String solucaoCompleta = "[Nível " + dificuldade + "] " + solucao;
+            
+            if (ordemServicoService.fecharOrdemServico(osCliente.getId(), solucaoCompleta, falha, usuarioLogado.getId())) {
+                JOptionPane.showMessageDialog(this, 
+                    "✅ OS #" + osCliente.getId() + " fechada com sucesso!\n\n" +
+                    "Cliente: " + nomeCliente + "\n" +
+                    "Falha: " + falha + "\n" +
+                    "Dificuldade: " + dificuldade);
+                carregarClientesMonitorados();
+            } else {
+                JOptionPane.showMessageDialog(this, "❌ Erro ao fechar OS!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    // ==================== RENDERIZADORES ====================
+    
+    private class ClienteRenderer extends DefaultTableCellRenderer {
+        public ClienteRenderer() {
+            setHorizontalAlignment(SwingConstants.LEFT);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            c.setForeground(Color.BLACK);
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+    
+    private class EquipamentoRenderer extends DefaultTableCellRenderer {
+        public EquipamentoRenderer() {
+            setHorizontalAlignment(SwingConstants.LEFT);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            c.setForeground(Color.BLACK);
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+    
+    private class EstadoRedeRenderer extends DefaultTableCellRenderer {
+        public EstadoRedeRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            Font currentFont = c.getFont();
+            c.setFont(new Font(currentFont.getName(), Font.BOLD, currentFont.getSize()));
+            
+            if (value != null) {
+                String estado = value.toString();
+                
+                if ("ATIVO".equals(estado)) {
+                    c.setForeground(new Color(0, 150, 0)); // Verde
+                } else if ("INATIVO".equals(estado)) {
+                    c.setForeground(Color.RED);
+                } else if ("SEM COMUNICAÇÃO".equals(estado)) {
+                    c.setForeground(Color.RED);
+                } else {
+                    c.setForeground(Color.BLACK);
+                }
+            }
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+    
+    private class TensaoRenderer extends DefaultTableCellRenderer {
+        public TensaoRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            Font currentFont = c.getFont();
+            c.setFont(new Font(currentFont.getName(), Font.BOLD, currentFont.getSize()));
+            
+            if (value != null && !"---".equals(value.toString())) {
+                try {
+                    double tensao = Double.parseDouble(value.toString().replace(",", "."));
+                    if (tensao == 0) {
+                        c.setForeground(Color.RED);
+                    } else if (tensao < 100) {
+                        c.setForeground(new Color(255, 100, 0)); // Laranja
+                    } else {
+                        c.setForeground(new Color(0, 0, 180)); // Azul
+                    }
+                } catch (NumberFormatException e) {
+                    c.setForeground(Color.GRAY);
+                }
+            } else if (value != null && "---".equals(value.toString())) {
+                c.setForeground(Color.GRAY);
+            }
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+    
+    private class SituacaoRedeRenderer extends DefaultTableCellRenderer {
+        public SituacaoRedeRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            Font currentFont = c.getFont();
+            c.setFont(new Font(currentFont.getName(), Font.BOLD, currentFont.getSize()));
+            
+            if (value != null) {
+                String situacao = value.toString();
+                
+                if (situacao.contains("NORMAL")) {
+                    c.setForeground(new Color(0, 150, 0)); // Verde
+                } else if (situacao.contains("ALERTA")) {
+                    c.setForeground(new Color(255, 140, 0)); // Laranja
+                } else if (situacao.contains("CRÍTICO")) {
+                    c.setForeground(Color.RED);
+                } else {
+                    c.setForeground(Color.BLACK);
+                }
+            }
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+    
+    /**
+     * Renderizador para DISPONIBILIDADE
+     * Regras de cores:
+     * - Disponibilidade >= 95%: 🟢 Verde
+     * - Disponibilidade entre 70% e 94%: 🟠 Laranja
+     * - Disponibilidade < 70% (incluindo 0%): 🔴 Vermelho
+     * - Quando selecionado: mantém a cor, apenas o fundo muda para azul claro
+     */
+    private class DisponibilidadeRenderer extends DefaultTableCellRenderer {
+        public DisponibilidadeRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            Font currentFont = c.getFont();
+            c.setFont(new Font(currentFont.getName(), Font.BOLD, currentFont.getSize()));
+            
+            if (value != null && !"---".equals(value.toString())) {
+                String dispStr = value.toString().replace("%", "").replace(",", ".");
+                try {
+                    double disponibilidade = Double.parseDouble(dispStr);
+                    
+                    if (disponibilidade >= 95) {
+                        c.setForeground(new Color(0, 150, 0)); // Verde
+                    } else if (disponibilidade >= 70) {
+                        c.setForeground(new Color(255, 140, 0)); // Laranja
+                    } else {
+                        c.setForeground(Color.RED); // Vermelho (inclui 0%)
+                    }
+                } catch (NumberFormatException e) {
+                    c.setForeground(Color.GRAY);
+                }
+            } else if (value != null && "---".equals(value.toString())) {
+                c.setForeground(Color.GRAY);
+            } else {
+                c.setForeground(Color.BLACK);
+            }
+            
+            if (isSelected) {
+                c.setBackground(table.getSelectionBackground());
+            } else {
+                c.setBackground(table.getBackground());
+            }
+            
+            return c;
+        }
+    }
+}

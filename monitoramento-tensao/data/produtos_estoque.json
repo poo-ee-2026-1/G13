@@ -1,0 +1,18 @@
+[ {
+  "id" : 1,
+  "codigo" : "1234567890",
+  "nome" : "Produto de Teste",
+  "categoria" : "EQUIPAMENTO",
+  "descricao" : "",
+  "fabricante" : "Fabricante de Teste",
+  "modelo" : "Modelo de Teste",
+  "quantidade" : 76,
+  "quantidadeMinima" : 1,
+  "precoCusto" : 10.0,
+  "precoVenda" : 10.0,
+  "unidadeMedida" : "UN",
+  "localizacao" : "Localização de Teste",
+  "ativo" : true,
+  "nomeCompleto" : "1234567890 - Produto de Teste (Modelo de Teste)",
+  "estoqueBaixo" : false
+} ]

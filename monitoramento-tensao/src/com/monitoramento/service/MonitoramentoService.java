@@ -1,0 +1,582 @@
+// MonitoramentoService.java - Versão Corrigida Completa
+package com.monitoramento.service;
+
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.dao.MedicaoTensaoDAO;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Equipamento;
+import com.monitoramento.model.MedicaoTensao;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class MonitoramentoService {
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private MedicaoTensaoDAO medicaoDAO;
+    
+    private Map<Integer, DadosMonitoramento> dadosMonitoramento;
+    private Map<Integer, Timer> timersCliente;
+    private Map<Integer, Integer> contadorSemComunicacao;
+    
+    private static final long TIMEOUT_SEM_COMUNICACAO = 5000;
+    private static final long INTERVALO_MEDICAO_ESPERADA = 2000;
+    private static final long INTERVALO_MINIMO_OS_AUTOMATICA = 30000;
+    
+    private OrdemServicoCallback ordemServicoCallback;
+    private boolean pausado = true; // ALTERADO: Iniciar PAUSADO
+    private Map<Integer, Long> ultimaOSAutomaticaPorCliente;
+    
+    public MonitoramentoService() {
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.medicaoDAO = new MedicaoTensaoDAO();
+        this.dadosMonitoramento = new ConcurrentHashMap<>();
+        this.timersCliente = new ConcurrentHashMap<>();
+        this.contadorSemComunicacao = new ConcurrentHashMap<>();
+        this.ultimaOSAutomaticaPorCliente = new ConcurrentHashMap<>();
+        
+        inicializarMonitoramento();
+    }
+    
+    private String determinarEstadoRede(Double tensao) {
+        if (tensao == null) return "SEM COMUNICAÇÃO";
+        if (tensao > 0) return "ATIVO";
+        if (tensao == 0) return "INATIVO";
+        return "SEM COMUNICAÇÃO";
+    }
+    
+    private String determinarSituacaoRede(double tensao, double tensaoNominal) {
+        if (tensao == 0) return "CRÍTICO";
+        double diferenca = Math.abs(tensao - tensaoNominal);
+        if (diferenca <= 1) return "NORMAL";
+        if (diferenca <= 3) return "ALERTA";
+        return "CRÍTICO";
+    }
+    
+    private void inicializarMonitoramento() {
+        List<Cliente> clientesMonitorados = clienteDAO.listarPorMonitoramento(true);
+        System.out.println("Inicializando monitoramento para " + clientesMonitorados.size() + " clientes (iniciando PAUSADO)");
+        
+        // NOTA: O monitoramento é inicializado mas fica pausado
+        // As OS automáticas não serão abertas enquanto pausado = true
+        for (Cliente cliente : clientesMonitorados) {
+            iniciarMonitoramentoCliente(cliente.getId());
+        }
+    }
+    
+    public void iniciarMonitoramentoCliente(int idCliente) {
+        Cliente cliente = clienteDAO.buscarPorId(idCliente);
+        if (cliente == null) {
+            System.err.println("Cliente " + idCliente + " não encontrado");
+            return;
+        }
+        if (!cliente.isEmMonitoramento()) {
+            System.err.println("Cliente " + idCliente + " não está marcado para monitoramento");
+            return;
+        }
+        List<Equipamento> equipamentos = equipamentoDAO.buscarPorCliente(idCliente);
+        if (equipamentos.isEmpty()) {
+            System.err.println("Cliente " + idCliente + " não possui equipamento cadastrado");
+            return;
+        }
+        
+        Equipamento equipamento = equipamentos.get(0);
+        DadosMonitoramento dados = new DadosMonitoramento();
+        dados.setIdCliente(idCliente);
+        dados.setEquipamento(equipamento);
+        dados.setTensaoNominal(equipamento.getTensaoNominal());
+        dados.setUltimaMedicao(null);
+        dados.setUltimoRecebimento(null);
+        dados.setMenorTensao(Double.MAX_VALUE);
+        dados.setMaiorTensao(Double.MIN_VALUE);
+        dados.setContadorMedicoes(0);
+        dados.setContadorAtivo(0);
+        dados.setContadorInativo(0);
+        dados.setContadorSemComunicacao(0);
+        dados.setContadorTempoSemComunicacao(0);
+        dados.setEstadoRedeAtual("AGUARDANDO");
+        dados.setUltimaVerificacaoDisponibilidade(new Date());
+        dados.setClienteNovoSemDados(true);
+        dados.setOsAbertaInativo(false);
+        dados.setOsAbertaAlerta(false);
+        dados.setOsAbertaCritico(false);
+        dados.setNotificouInativo(false);
+        dados.resetarContadorAlertasConsecutivos();
+        dados.resetarContadorCriticosConsecutivos();
+        
+        dadosMonitoramento.put(idCliente, dados);
+        
+        Timer timerAntigo = timersCliente.get(idCliente);
+        if (timerAntigo != null) timerAntigo.cancel();
+        
+        Timer timer = new Timer(true);
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                verificarTimeoutCliente(idCliente);
+            }
+        }, TIMEOUT_SEM_COMUNICACAO, TIMEOUT_SEM_COMUNICACAO);
+        
+        timersCliente.put(idCliente, timer);
+        System.out.println("Monitoramento iniciado para cliente ID: " + idCliente);
+    }
+    
+    public void pararMonitoramentoCliente(int idCliente) {
+        Timer timer = timersCliente.remove(idCliente);
+        if (timer != null) timer.cancel();
+        dadosMonitoramento.remove(idCliente);
+        contadorSemComunicacao.remove(idCliente);
+        ultimaOSAutomaticaPorCliente.remove(idCliente);
+        System.out.println("Monitoramento parado para cliente ID: " + idCliente);
+    }
+    
+    /**
+     * Controla o estado de pausa do monitoramento
+     * Quando pausado = true, nenhuma OS automática será aberta
+     * Quando pausado = false, as OS automáticas voltam a funcionar
+     */
+    public void setPausado(boolean pausado) {
+        boolean estavaPausado = this.pausado;
+        this.pausado = pausado;
+        
+        if (estavaPausado && !pausado) {
+            System.out.println("=== MONITORAMENTO RETOMADO ===");
+            System.out.println("Verificando condições atuais para abertura de OS automáticas...");
+            
+            // Forçar uma reavaliação completa do estado de cada cliente
+            for (DadosMonitoramento dados : dadosMonitoramento.values()) {
+                Double ultimaTensao = dados.getUltimaMedicao();
+                int idCliente = dados.getIdCliente();
+                
+                System.out.println("\n--- Reavaliando cliente " + idCliente + " ---");
+                System.out.println("  Última tensão: " + (ultimaTensao != null ? ultimaTensao + "V" : "nenhuma"));
+                System.out.println("  Tensão nominal: " + dados.getTensaoNominal() + "V");
+                
+                // Reset COMPLETO das flags e contadores
+                dados.setOsAbertaInativo(false);
+                dados.setOsAbertaAlerta(false);
+                dados.setOsAbertaCritico(false);
+                dados.setNotificouInativo(false);
+                dados.resetarContadorAlertasConsecutivos();
+                dados.resetarContadorCriticosConsecutivos();
+                dados.setInicioEstadoInativo(null);
+                contadorSemComunicacao.put(idCliente, 0);
+                
+                // Limpar o timestamp da última OS para permitir nova abertura
+                ultimaOSAutomaticaPorCliente.remove(idCliente);
+                
+                if (ultimaTensao != null) {
+                    String situacao = determinarSituacaoRede(ultimaTensao, dados.getTensaoNominal());
+                    System.out.println("  Situação atual: " + situacao);
+                    
+                    if (ultimaTensao == 0) {
+                        dados.setInicioEstadoInativo(new Date());
+                        dados.setNotificouInativo(true);
+                        System.out.println("  ↳ Cliente está INATIVO - iniciando contagem para OS");
+                        
+                        // Verificar imediatamente se já deve abrir OS por inatividade
+                        verificarAberturaOSAutomatica(idCliente, ultimaTensao, situacao);
+                        
+                    } else if ("ALERTA".equals(situacao)) {
+                        dados.incrementarContadorAlertasConsecutivos();
+                        System.out.println("  ↳ Cliente está em ALERTA - contagem: 1");
+                        verificarAberturaOSAutomatica(idCliente, ultimaTensao, situacao);
+                        
+                    } else if ("CRÍTICO".equals(situacao)) {
+                        dados.incrementarContadorCriticosConsecutivos();
+                        System.out.println("  ↳ Cliente está em CRÍTICO - contagem: 1");
+                        verificarAberturaOSAutomatica(idCliente, ultimaTensao, situacao);
+                        
+                    } else {
+                        System.out.println("  ↳ Cliente está NORMAL - nenhuma ação necessária");
+                    }
+                } else {
+                    System.out.println("  ↳ Cliente sem medição - verificando timeout...");
+                    verificarTimeoutCliente(idCliente);
+                }
+            }
+            
+            System.out.println("=== VERIFICAÇÃO PÓS-RETOMADA CONCLUÍDA ===");
+            
+        } else if (!estavaPausado && pausado) {
+            System.out.println("=== MONITORAMENTO PAUSADO - OS AUTOMÁTICAS SUSPENSAS ===");
+        }
+        
+        System.out.println("MonitoramentoService - Pausado: " + pausado);
+    }
+    
+    public boolean isPausado() { 
+        return pausado; 
+    }
+    
+    public void receberMedicao(int idCliente, double tensao) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null) {
+            System.err.println("Cliente " + idCliente + " não está em monitoramento");
+            return;
+        }
+        
+        Date agora = new Date();
+        dados.setUltimaMedicao(tensao);
+        dados.setUltimoRecebimento(agora);
+        dados.setUltimaVerificacaoDisponibilidade(agora);
+        dados.setClienteNovoSemDados(false);
+        
+        if (tensao < dados.getMenorTensao()) dados.setMenorTensao(tensao);
+        if (tensao > dados.getMaiorTensao()) dados.setMaiorTensao(tensao);
+        
+        String estadoRede = determinarEstadoRede(tensao);
+        if (tensao > 0) {
+            dados.incrementarContadorAtivo();
+            // Reset flags quando a tensão volta ao normal
+            if (dados.isNotificouInativo() || dados.isOsAbertaInativo()) {
+                System.out.println("[RECUPERADO] Cliente " + idCliente + " saiu do estado INATIVO");
+                dados.setNotificouInativo(false);
+                dados.setOsAbertaInativo(false);
+                dados.setInicioEstadoInativo(null);
+            }
+            // Reset contadores de alerta/crítico quando a tensão normaliza
+            if (dados.getContadorAlertasConsecutivos() > 0) {
+                dados.resetarContadorAlertasConsecutivos();
+                dados.setOsAbertaAlerta(false);
+            }
+            if (dados.getContadorCriticosConsecutivos() > 0) {
+                dados.resetarContadorCriticosConsecutivos();
+                dados.setOsAbertaCritico(false);
+            }
+        } else {
+            dados.incrementarContadorInativo();
+        }
+        
+        String situacaoRede = determinarSituacaoRede(tensao, dados.getTensaoNominal());
+        
+        MedicaoTensao medicao = new MedicaoTensao();
+        medicao.setIdCliente(idCliente);
+        medicao.setTensao(tensao);
+        medicao.setDataHora(agora);
+        medicao.setEstadoRede(estadoRede);
+        medicao.setSituacaoRede(situacaoRede);
+        medicaoDAO.inserir(medicao);
+        
+        dados.incrementarContadorMedicoes();
+        dados.setEstadoRedeAtual(estadoRede);
+        dados.setContadorTempoSemComunicacao(0);
+        contadorSemComunicacao.put(idCliente, 0);
+        
+        // Só verifica abertura de OS automática se NÃO estiver pausado
+        if (!pausado) {
+            verificarAberturaOSAutomatica(idCliente, tensao, situacaoRede);
+        } else {
+            System.out.println("[PAUSADO] Medição registrada mas OS automática NÃO verificada para cliente " + idCliente);
+        }
+        
+        System.out.println("Medição - Cliente: " + idCliente + ", Tensão: " + tensao + 
+                         "V, Estado: " + estadoRede + ", Situação: " + situacaoRede);
+    }
+    
+    private void verificarAberturaOSAutomatica(int idCliente, double tensao, String situacaoRede) {
+        // SE ESTIVER PAUSADO, NÃO ABRE OS AUTOMÁTICA
+        if (pausado) {
+            System.out.println("[PAUSADO] OS automática NÃO aberta para cliente " + idCliente);
+            return;
+        }
+        
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null) return;
+        
+        long agora = System.currentTimeMillis();
+        Long ultimaOS = ultimaOSAutomaticaPorCliente.get(idCliente);
+        if (ultimaOS != null && (agora - ultimaOS) < INTERVALO_MINIMO_OS_AUTOMATICA) {
+            long segRestantes = (INTERVALO_MINIMO_OS_AUTOMATICA - (agora - ultimaOS)) / 1000;
+            System.out.println("[AGUARDANDO] Cliente " + idCliente + " - aguardando " + segRestantes + "s para nova OS");
+            return;
+        }
+        
+        // REGRA 1: TENSÃO INATIVA (tensão == 0)
+        if (tensao == 0) {
+            if (!dados.isNotificouInativo()) {
+                dados.setInicioEstadoInativo(new Date());
+                dados.setNotificouInativo(true);
+                System.out.println("[INATIVO] Cliente " + idCliente + " entrou em estado INATIVO");
+            } else {
+                long duracao = agora - dados.getInicioEstadoInativo().getTime();
+                if (duracao >= 5000 && !dados.isOsAbertaInativo()) {
+                    abrirOSAutomatica(idCliente, "Tensão INATIVA por mais de 5 segundos (tensão = 0V)", "REPARO");
+                    dados.setOsAbertaInativo(true);
+                    ultimaOSAutomaticaPorCliente.put(idCliente, agora);
+                    System.out.println("[OS ABERTA] Cliente " + idCliente + " - INATIVO");
+                }
+            }
+        } else {
+            // Reset das flags de inativo quando a tensão volta
+            if (dados.isNotificouInativo() || dados.isOsAbertaInativo()) {
+                System.out.println("[RECUPERADO] Cliente " + idCliente + " saiu do estado INATIVO");
+                dados.setNotificouInativo(false);
+                dados.setOsAbertaInativo(false);
+                dados.setInicioEstadoInativo(null);
+            }
+        }
+        
+        // REGRA 2: ALERTA (tensão > 0, diferença entre 1V e 3V)
+        if ("ALERTA".equals(situacaoRede) && tensao > 0) {
+            dados.incrementarContadorAlertasConsecutivos();
+            int alertas = dados.getContadorAlertasConsecutivos();
+            System.out.println("[ALERTA] Cliente " + idCliente + " - Alerta #" + alertas);
+            
+            if (alertas >= 3 && !dados.isOsAbertaAlerta()) {
+                double diferenca = Math.abs(tensao - dados.getTensaoNominal());
+                String motivo = String.format("3 medições consecutivas em ALERTA (diferença de %.2fV)", diferenca);
+                abrirOSAutomatica(idCliente, motivo, "INFORMACAO");
+                dados.setOsAbertaAlerta(true);
+                ultimaOSAutomaticaPorCliente.put(idCliente, agora);
+                System.out.println("[OS ABERTA] Cliente " + idCliente + " - ALERTA");
+            }
+        } else if (tensao > 0 && !"CRÍTICO".equals(situacaoRede)) {
+            // Reset contador de alertas quando sai do estado de alerta
+            if (dados.getContadorAlertasConsecutivos() > 0) {
+                System.out.println("[RECUPERADO] Cliente " + idCliente + " saiu do estado ALERTA");
+                dados.resetarContadorAlertasConsecutivos();
+                dados.setOsAbertaAlerta(false);
+            }
+        }
+        
+        // REGRA 3: CRÍTICO (tensão > 0, diferença > 3V)
+        if ("CRÍTICO".equals(situacaoRede) && tensao > 0) {
+            dados.incrementarContadorCriticosConsecutivos();
+            int criticos = dados.getContadorCriticosConsecutivos();
+            System.out.println("[CRÍTICO] Cliente " + idCliente + " - Crítico #" + criticos);
+            
+            if (criticos >= 3 && !dados.isOsAbertaCritico()) {
+                double diferenca = Math.abs(tensao - dados.getTensaoNominal());
+                String motivo = String.format("3 medições consecutivas em CRÍTICO (diferença de %.2fV)", diferenca);
+                abrirOSAutomatica(idCliente, motivo, "REPARO");
+                dados.setOsAbertaCritico(true);
+                ultimaOSAutomaticaPorCliente.put(idCliente, agora);
+                System.out.println("[OS ABERTA] Cliente " + idCliente + " - CRÍTICO");
+            }
+        } else if (tensao > 0 && !"CRÍTICO".equals(situacaoRede)) {
+            // Reset contador de críticos quando sai do estado crítico
+            if (dados.getContadorCriticosConsecutivos() > 0) {
+                System.out.println("[RECUPERADO] Cliente " + idCliente + " saiu do estado CRÍTICO");
+                dados.resetarContadorCriticosConsecutivos();
+                dados.setOsAbertaCritico(false);
+            }
+        }
+    }
+    
+    private void verificarTimeoutCliente(int idCliente) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null) return;
+        
+        Date agora = new Date();
+        Date ultimoRecebimento = dados.getUltimoRecebimento();
+        
+        if (ultimoRecebimento == null) {
+            dados.setEstadoRedeAtual("SEM COMUNICAÇÃO");
+            dados.incrementarContadorSemComunicacao();
+            dados.incrementarContadorTempoSemComunicacao();
+            
+            int contador = contadorSemComunicacao.getOrDefault(idCliente, 0);
+            contador++;
+            contadorSemComunicacao.put(idCliente, contador);
+            
+            // Só abre OS automática se NÃO estiver pausado
+            if (contador >= 2 && !pausado && !dados.isOsAbertaInativo()) {
+                abrirOSAutomatica(idCliente, "Cliente sem comunicação por mais de 10 segundos", "REPARO");
+                dados.setOsAbertaInativo(true);
+                contadorSemComunicacao.put(idCliente, 0);
+                ultimaOSAutomaticaPorCliente.put(idCliente, System.currentTimeMillis());
+                System.out.println("[OS ABERTA] Cliente " + idCliente + " - SEM COMUNICAÇÃO");
+            } else if (contador >= 2 && pausado) {
+                System.out.println("[PAUSADO] Cliente " + idCliente + " sem comunicação, mas monitoramento pausado - OS não aberta");
+            }
+        } else {
+            long diferenca = agora.getTime() - ultimoRecebimento.getTime();
+            if (diferenca > TIMEOUT_SEM_COMUNICACAO) {
+                dados.setEstadoRedeAtual("SEM COMUNICAÇÃO");
+                dados.incrementarContadorSemComunicacao();
+                dados.incrementarContadorTempoSemComunicacao();
+                
+                int contador = contadorSemComunicacao.getOrDefault(idCliente, 0);
+                contador++;
+                contadorSemComunicacao.put(idCliente, contador);
+                
+                if (contador >= 2 && !pausado && !dados.isOsAbertaInativo()) {
+                    abrirOSAutomatica(idCliente, "Cliente sem comunicação por mais de 10 segundos", "REPARO");
+                    dados.setOsAbertaInativo(true);
+                    contadorSemComunicacao.put(idCliente, 0);
+                    ultimaOSAutomaticaPorCliente.put(idCliente, System.currentTimeMillis());
+                    System.out.println("[OS ABERTA] Cliente " + idCliente + " - SEM COMUNICAÇÃO");
+                } else if (contador >= 2 && pausado) {
+                    System.out.println("[PAUSADO] Cliente " + idCliente + " sem comunicação, mas monitoramento pausado - OS não aberta");
+                }
+            } else {
+                dados.setContadorTempoSemComunicacao(0);
+                contadorSemComunicacao.put(idCliente, 0);
+                Double ultimaTensao = dados.getUltimaMedicao();
+                if (ultimaTensao != null) {
+                    dados.setEstadoRedeAtual(determinarEstadoRede(ultimaTensao));
+                }
+            }
+        }
+        atualizarDisponibilidade(dados, agora);
+    }
+    
+    private void atualizarDisponibilidade(DadosMonitoramento dados, Date agora) {
+        if (dados.getUltimaVerificacaoDisponibilidade() == null) {
+            dados.setUltimaVerificacaoDisponibilidade(agora);
+            return;
+        }
+        
+        long tempoDecorrido = agora.getTime() - dados.getUltimaVerificacaoDisponibilidade().getTime();
+        if (tempoDecorrido >= INTERVALO_MEDICAO_ESPERADA && "SEM COMUNICAÇÃO".equals(dados.getEstadoRedeAtual())) {
+            int ciclosPerdidos = (int) (tempoDecorrido / INTERVALO_MEDICAO_ESPERADA);
+            for (int i = 0; i < ciclosPerdidos; i++) {
+                dados.incrementarContadorMedicoes();
+                dados.incrementarContadorInativo();
+                dados.incrementarContadorSemComunicacao();
+            }
+            dados.setUltimaVerificacaoDisponibilidade(agora);
+        }
+    }
+    
+    private void abrirOSAutomatica(int idCliente, String motivo, String tipoOs) {
+        // Proteção extra: verificar novamente se está pausado
+        if (pausado) {
+            System.out.println("[PAUSADO] Abertura de OS automática cancelada para cliente " + idCliente);
+            return;
+        }
+        
+        System.out.println("[AUTO] Abrindo OS para cliente " + idCliente + " - Tipo: " + tipoOs + " - Motivo: " + motivo);
+        if (ordemServicoCallback != null) {
+            ordemServicoCallback.onAbrirOSAutomatica(idCliente, motivo);
+        } else {
+            System.err.println("[ERRO] OrdemServicoCallback é NULL! Não foi possível abrir OS automática.");
+        }
+    }
+    
+    public double calcularDisponibilidade(int idCliente) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null) return 0.0;
+        
+        int total = dados.getContadorMedicoes();
+        int ativos = dados.getContadorAtivo();
+        
+        if (dados.isClienteNovoSemDados() && total == 0) return 0.0;
+        if (total == 0) return 0.0;
+        
+        double disp = (ativos * 100.0) / total;
+        return Math.round(Math.max(0, Math.min(100, disp)) * 100.0) / 100.0;
+    }
+    
+    public DadosMonitoramento getDadosMonitoramento(int idCliente) {
+        return dadosMonitoramento.get(idCliente);
+    }
+    
+    public List<DadosMonitoramento> listarTodosDadosMonitoramento() {
+        return new ArrayList<>(dadosMonitoramento.values());
+    }
+    
+    public void setOrdemServicoCallback(OrdemServicoCallback callback) {
+        this.ordemServicoCallback = callback;
+    }
+    
+    public interface OrdemServicoCallback {
+        void onAbrirOSAutomatica(int idCliente, String motivo);
+    }
+    
+    public static class DadosMonitoramento {
+        private int idCliente;
+        private Equipamento equipamento;
+        private double tensaoNominal;
+        private Double ultimaMedicao;
+        private Date ultimoRecebimento;
+        private double menorTensao = Double.MAX_VALUE;
+        private double maiorTensao = Double.MIN_VALUE;
+        private String estadoRedeAtual;
+        private int contadorMedicoes;
+        private int contadorAtivo;
+        private int contadorInativo;
+        private int contadorSemComunicacao;
+        private int contadorTempoSemComunicacao;
+        private int contadorAlertasConsecutivos;
+        private int contadorCriticosConsecutivos;
+        private Date inicioEstadoInativo;
+        private boolean notificouInativo;
+        private boolean osAbertaInativo;
+        private boolean osAbertaAlerta;
+        private boolean osAbertaCritico;
+        private Date ultimaVerificacaoDisponibilidade;
+        private boolean clienteNovoSemDados;
+        
+        public DadosMonitoramento() {
+            this.clienteNovoSemDados = true;
+            this.ultimaVerificacaoDisponibilidade = new Date();
+        }
+        
+        // Getters e Setters
+        public int getIdCliente() { return idCliente; }
+        public void setIdCliente(int idCliente) { this.idCliente = idCliente; }
+        public Equipamento getEquipamento() { return equipamento; }
+        public void setEquipamento(Equipamento equipamento) { this.equipamento = equipamento; }
+        public double getTensaoNominal() { return tensaoNominal; }
+        public void setTensaoNominal(double tensaoNominal) { this.tensaoNominal = tensaoNominal; }
+        public Double getUltimaMedicao() { return ultimaMedicao; }
+        public void setUltimaMedicao(Double ultimaMedicao) { this.ultimaMedicao = ultimaMedicao; }
+        public Date getUltimoRecebimento() { return ultimoRecebimento; }
+        public void setUltimoRecebimento(Date ultimoRecebimento) { this.ultimoRecebimento = ultimoRecebimento; }
+        public double getMenorTensao() { return menorTensao; }
+        public void setMenorTensao(double menorTensao) { this.menorTensao = menorTensao; }
+        public double getMaiorTensao() { return maiorTensao; }
+        public void setMaiorTensao(double maiorTensao) { this.maiorTensao = maiorTensao; }
+        public String getEstadoRedeAtual() { return estadoRedeAtual; }
+        public void setEstadoRedeAtual(String estadoRedeAtual) { this.estadoRedeAtual = estadoRedeAtual; }
+        public int getContadorMedicoes() { return contadorMedicoes; }
+        public void setContadorMedicoes(int contadorMedicoes) { this.contadorMedicoes = contadorMedicoes; }
+        public int getContadorAtivo() { return contadorAtivo; }
+        public void setContadorAtivo(int contadorAtivo) { this.contadorAtivo = contadorAtivo; }
+        public int getContadorInativo() { return contadorInativo; }
+        public void setContadorInativo(int contadorInativo) { this.contadorInativo = contadorInativo; }
+        public int getContadorSemComunicacao() { return contadorSemComunicacao; }
+        public void setContadorSemComunicacao(int contadorSemComunicacao) { this.contadorSemComunicacao = contadorSemComunicacao; }
+        public int getContadorTempoSemComunicacao() { return contadorTempoSemComunicacao; }
+        public void setContadorTempoSemComunicacao(int contadorTempoSemComunicacao) { this.contadorTempoSemComunicacao = contadorTempoSemComunicacao; }
+        public int getContadorAlertasConsecutivos() { return contadorAlertasConsecutivos; }
+        public int getContadorCriticosConsecutivos() { return contadorCriticosConsecutivos; }
+        public Date getInicioEstadoInativo() { return inicioEstadoInativo; }
+        public void setInicioEstadoInativo(Date inicioEstadoInativo) { this.inicioEstadoInativo = inicioEstadoInativo; }
+        public boolean isNotificouInativo() { return notificouInativo; }
+        public void setNotificouInativo(boolean notificouInativo) { this.notificouInativo = notificouInativo; }
+        public boolean isOsAbertaInativo() { return osAbertaInativo; }
+        public void setOsAbertaInativo(boolean osAbertaInativo) { this.osAbertaInativo = osAbertaInativo; }
+        public boolean isOsAbertaAlerta() { return osAbertaAlerta; }
+        public void setOsAbertaAlerta(boolean osAbertaAlerta) { this.osAbertaAlerta = osAbertaAlerta; }
+        public boolean isOsAbertaCritico() { return osAbertaCritico; }
+        public void setOsAbertaCritico(boolean osAbertaCritico) { this.osAbertaCritico = osAbertaCritico; }
+        public Date getUltimaVerificacaoDisponibilidade() { return ultimaVerificacaoDisponibilidade; }
+        public void setUltimaVerificacaoDisponibilidade(Date ultimaVerificacaoDisponibilidade) { this.ultimaVerificacaoDisponibilidade = ultimaVerificacaoDisponibilidade; }
+        public boolean isClienteNovoSemDados() { return clienteNovoSemDados; }
+        public void setClienteNovoSemDados(boolean clienteNovoSemDados) { this.clienteNovoSemDados = clienteNovoSemDados; }
+        
+        public void incrementarContadorMedicoes() { this.contadorMedicoes++; }
+        public void incrementarContadorAtivo() { this.contadorAtivo++; }
+        public void incrementarContadorInativo() { this.contadorInativo++; }
+        public void incrementarContadorSemComunicacao() { this.contadorSemComunicacao++; }
+        public void incrementarContadorTempoSemComunicacao() { this.contadorTempoSemComunicacao++; }
+        public void incrementarContadorAlertasConsecutivos() { this.contadorAlertasConsecutivos++; }
+        public void incrementarContadorCriticosConsecutivos() { this.contadorCriticosConsecutivos++; }
+        public void resetarContadorAlertasConsecutivos() { this.contadorAlertasConsecutivos = 0; }
+        public void resetarContadorCriticosConsecutivos() { this.contadorCriticosConsecutivos = 0; }
+        public void resetarContadoresDisponibilidade() {
+            this.contadorMedicoes = 0;
+            this.contadorAtivo = 0;
+            this.contadorInativo = 0;
+            this.contadorSemComunicacao = 0;
+            this.contadorTempoSemComunicacao = 0;
+            this.ultimaVerificacaoDisponibilidade = new Date();
+            this.clienteNovoSemDados = true;
+        }
+    }
+}

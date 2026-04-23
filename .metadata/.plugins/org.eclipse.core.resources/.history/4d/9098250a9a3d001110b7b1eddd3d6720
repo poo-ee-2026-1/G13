@@ -1,0 +1,427 @@
+// OrdemServicoService.java
+package com.monitoramento.service;
+
+import com.monitoramento.dao.OrdemServicoDAO;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.dao.UsuarioDAO;
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Equipamento;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+public class OrdemServicoService implements MonitoramentoService.OrdemServicoCallback {
+    private OrdemServicoDAO ordemServicoDAO;
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private UsuarioDAO usuarioDAO;
+    private MonitoramentoService monitoramentoService;
+    
+    private Queue<OrdemServico> filaOSPrimeiroNivel;
+    private Queue<OrdemServico> filaOSSegundoNivel;
+    private Queue<OrdemServico> filaOSTerceiroNivel;
+    
+    private List<OSListener> listeners;
+    
+    public OrdemServicoService(MonitoramentoService monitoramentoService) {
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.usuarioDAO = new UsuarioDAO();
+        this.monitoramentoService = monitoramentoService;
+        this.filaOSPrimeiroNivel = new ConcurrentLinkedQueue<>();
+        this.filaOSSegundoNivel = new ConcurrentLinkedQueue<>();
+        this.filaOSTerceiroNivel = new ConcurrentLinkedQueue<>();
+        this.listeners = new ArrayList<>();
+        
+        if (monitoramentoService != null) {
+            monitoramentoService.setOrdemServicoCallback(this);
+        }
+        
+        carregarOrdensAbertas();
+    }
+    
+    private void carregarOrdensAbertas() {
+        List<OrdemServico> ordensAbertas = ordemServicoDAO.buscarPorStatus("ABERTA");
+        for (OrdemServico os : ordensAbertas) {
+            adicionarNaFilaPorNivel(os);
+            notificarOSCriada(os);
+        }
+    }
+    
+    private void adicionarNaFilaPorNivel(OrdemServico os) {
+        if ("1º Nível".equals(os.getTipoNivel())) {
+            filaOSPrimeiroNivel.add(os);
+        } else if ("2º Nível".equals(os.getTipoNivel())) {
+            filaOSSegundoNivel.add(os);
+        } else if ("3º Nível".equals(os.getTipoNivel())) {
+            filaOSTerceiroNivel.add(os);
+        }
+    }
+    
+    @Override
+    public void onAbrirOSAutomatica(int idCliente, String motivo) {
+        abrirOrdemServico(idCliente, motivo, "REPARO", "MONITORAMENTO", true);
+    }
+    
+    // MÉTODOS PARA ABERTURA DE OS POR DEPARTAMENTO
+    public OrdemServico abrirOSAtendimento(int idCliente, String motivo, int idUsuario, String assunto) {
+        return abrirOrdemServico(idCliente, motivo, "INFORMACAO", "ATENDIMENTO", false, idUsuario);
+    }
+    
+    public OrdemServico abrirOSSuporteTecnico(int idCliente, String motivo, int idUsuario) {
+        return abrirOrdemServico(idCliente, motivo, "REPARO", "SUPORTE_TECNICO", false, idUsuario);
+    }
+    
+    public OrdemServico abrirOSTI(int idCliente, String motivo, int idUsuario) {
+        return abrirOrdemServico(idCliente, motivo, "REPARO", "TI", false, idUsuario);
+    }
+    
+    public OrdemServico abrirOSInstalacao(int idCliente, String motivo, int idUsuario, 
+                                          double valorTotal, String endereco, 
+                                          Date dataAgendamento) {
+        OrdemServico os = abrirOrdemServico(idCliente, motivo, "INSTALACAO", "VENDAS", false, idUsuario);
+        if (os != null) {
+            os.setValorTotal(valorTotal);
+            os.setEnderecoInstalacao(endereco);
+            os.setDataAgendamento(dataAgendamento);
+            ordemServicoDAO.atualizar(os);
+        }
+        return os;
+    }
+    
+    public OrdemServico abrirOSInstalacaoCompleta(int idCliente, String motivo, int idUsuario, 
+                                                   double valorTotal, String endereco, 
+                                                   Date dataAgendamento, String descricao, 
+                                                   String observacoes) {
+        OrdemServico os = abrirOrdemServico(idCliente, motivo, "INSTALACAO", "VENDAS", false, idUsuario);
+        if (os != null) {
+            os.setValorTotal(valorTotal);
+            os.setEnderecoInstalacao(endereco);
+            os.setDataAgendamento(dataAgendamento);
+            os.setDescricaoSolucao(descricao);
+            os.setObservacoes(observacoes);
+            ordemServicoDAO.atualizar(os);
+        }
+        return os;
+    }
+    
+    public OrdemServico abrirOSOrcamento(int idCliente, String motivo, int idUsuario, double valorTotal) {
+        OrdemServico os = abrirOrdemServico(idCliente, motivo, "ORCAMENTO", "VENDAS", false, idUsuario);
+        if (os != null) {
+            os.setValorTotal(valorTotal);
+            ordemServicoDAO.atualizar(os);
+        }
+        return os;
+    }
+    
+    public OrdemServico abrirOrdemServicoManual(int idCliente, String motivo, int idUsuario) {
+        return abrirOrdemServico(idCliente, motivo, "REPARO", "SUPORTE_TECNICO", false, idUsuario);
+    }
+    
+    private OrdemServico abrirOrdemServico(int idCliente, String motivo, String tipoOs, 
+                                            String departamentoOrigem, boolean automatica) {
+        return abrirOrdemServico(idCliente, motivo, tipoOs, departamentoOrigem, automatica, 0);
+    }
+    
+    private OrdemServico abrirOrdemServico(int idCliente, String motivo, String tipoOs, 
+                                            String departamentoOrigem, boolean automatica, int idUsuario) {
+        List<OrdemServico> ordensAbertas = ordemServicoDAO.buscarOrdensAbertasPorCliente(idCliente);
+        if (!ordensAbertas.isEmpty()) {
+            System.out.println("Cliente " + idCliente + " já possui OS aberta: " + ordensAbertas.get(0).getId());
+            return ordensAbertas.get(0);
+        }
+        
+        Cliente cliente = clienteDAO.buscarPorId(idCliente);
+        if (cliente == null) {
+            System.err.println("Cliente não encontrado: " + idCliente);
+            return null;
+        }
+        
+        List<Equipamento> equipamentos = equipamentoDAO.buscarPorCliente(idCliente);
+        
+        OrdemServico os = new OrdemServico();
+        os.setIdCliente(idCliente);
+        os.setIdEquipamento(equipamentos.isEmpty() ? 0 : equipamentos.get(0).getId());
+        os.setTipoNivel("1º Nível");
+        os.setStatus("ABERTA");
+        os.setMotivo(motivo);
+        os.setDataAbertura(new Date());
+        os.setTipoOs(tipoOs);
+        os.setDepartamentoOrigem(departamentoOrigem);
+        
+        if (automatica) {
+            os.setIdUsuarioAbertura(0);
+        } else {
+            os.setIdUsuarioAbertura(idUsuario);
+        }
+        
+        if ("INSTALACAO".equals(tipoOs)) {
+            os.setTipoOrdem("INSTALACAO");
+        } else if ("ORCAMENTO".equals(tipoOs)) {
+            os.setTipoOrdem("ORCAMENTO");
+        } else {
+            os.setTipoOrdem("SERVICO");
+        }
+        
+        boolean inserido = ordemServicoDAO.inserir(os);
+        if (inserido) {
+            adicionarNaFilaPorNivel(os);
+            notificarOSCriada(os);
+            System.out.println("OS #" + os.getId() + " aberta para cliente " + idCliente + 
+                             " - Tipo: " + tipoOs + " - Motivo: " + motivo + 
+                             (automatica ? " (Automática)" : " (Manual)"));
+            return os;
+        }
+        
+        return null;
+    }
+    
+    // MÉTODOS DE ESCALONAMENTO
+    public boolean escalarParaSegundoNivel(int idOS) {
+        return escalarOrdem(idOS, "2º Nível");
+    }
+    
+    public boolean escalarParaTerceiroNivel(int idOS) {
+        return escalarOrdem(idOS, "3º Nível");
+    }
+    
+    private boolean escalarOrdem(int idOS, String novoNivel) {
+        OrdemServico os = ordemServicoDAO.buscarPorId(idOS);
+        if (os == null) {
+            System.err.println("OS não encontrada: " + idOS);
+            return false;
+        }
+        
+        if (!"ABERTA".equals(os.getStatus())) {
+            System.err.println("OS não está aberta: " + idOS);
+            return false;
+        }
+        
+        String nivelAtual = os.getTipoNivel();
+        
+        if ("1º Nível".equals(nivelAtual) && "2º Nível".equals(novoNivel)) {
+            // OK
+        } else if ("2º Nível".equals(nivelAtual) && "3º Nível".equals(novoNivel)) {
+            // OK
+        } else {
+            System.err.println("Escalação inválida de " + nivelAtual + " para " + novoNivel);
+            return false;
+        }
+        
+        os.setTipoNivel(novoNivel);
+        boolean atualizado = ordemServicoDAO.atualizar(os);
+        
+        if (atualizado) {
+            if ("1º Nível".equals(nivelAtual)) {
+                filaOSPrimeiroNivel.remove(os);
+            } else if ("2º Nível".equals(nivelAtual)) {
+                filaOSSegundoNivel.remove(os);
+            }
+            
+            if ("2º Nível".equals(novoNivel)) {
+                filaOSSegundoNivel.add(os);
+            } else if ("3º Nível".equals(novoNivel)) {
+                filaOSTerceiroNivel.add(os);
+            }
+            
+            notificarOSEscalada(os);
+            System.out.println("OS #" + idOS + " escalada para " + novoNivel);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // MÉTODOS DE FECHAMENTO
+    public boolean fecharOrdemServico(int idOS, String descricaoSolucao, String falhaIdentificada, int idUsuario) {
+        OrdemServico os = ordemServicoDAO.buscarPorId(idOS);
+        if (os == null) {
+            System.err.println("OS não encontrada: " + idOS);
+            return false;
+        }
+        
+        if (!"ABERTA".equals(os.getStatus())) {
+            System.err.println("OS não está aberta: " + idOS);
+            return false;
+        }
+        
+        boolean fechado = ordemServicoDAO.fecharOrdemServico(idOS, descricaoSolucao, falhaIdentificada, idUsuario);
+        
+        if (fechado) {
+            filaOSPrimeiroNivel.remove(os);
+            filaOSSegundoNivel.remove(os);
+            filaOSTerceiroNivel.remove(os);
+            notificarOSFechada(os);
+            System.out.println("OS #" + idOS + " fechada por usuário " + idUsuario);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // MÉTODOS DE LISTAGEM POR TIPO
+    public List<OrdemServico> listarOsInformacao() {
+        return ordemServicoDAO.listarOsInformacao();
+    }
+    
+    public List<OrdemServico> listarOsReparo() {
+        return ordemServicoDAO.listarOsReparo();
+    }
+    
+    public List<OrdemServico> listarOsInstalacao() {
+        List<OrdemServico> instalacoes = ordemServicoDAO.listarOsInstalacao();
+        System.out.println("OrdemServicoService.listarOsInstalacao() retornou " + instalacoes.size() + " registros");
+        return instalacoes;
+    }
+    
+    public List<OrdemServico> listarOsOrcamento() {
+        return ordemServicoDAO.listarOsOrcamento();
+    }
+    
+    public List<OrdemServico> listarPorDepartamentoOrigem(String departamento) {
+        return ordemServicoDAO.listarPorDepartamentoOrigem(departamento);
+    }
+    
+    // MÉTODOS DE LISTAGEM GERAL
+    public OrdemServico getProximaOSPrimeiroNivel() {
+        return filaOSPrimeiroNivel.peek();
+    }
+    
+    public OrdemServico getProximaOSSegundoNivel() {
+        return filaOSSegundoNivel.peek();
+    }
+    
+    public OrdemServico getProximaOSTerceiroNivel() {
+        return filaOSTerceiroNivel.peek();
+    }
+    
+    public List<OrdemServico> listarTodasOS() {
+        return ordemServicoDAO.listarTodas();
+    }
+    
+    public List<OrdemServico> listarOSAbertas() {
+        return ordemServicoDAO.buscarPorStatus("ABERTA");
+    }
+    
+    public List<OrdemServico> listarOSFechadas() {
+        return ordemServicoDAO.buscarPorStatus("FECHADA");
+    }
+    
+    public List<OrdemServico> listarOSPorCliente(int idCliente) {
+        return ordemServicoDAO.buscarPorCliente(idCliente);
+    }
+    
+    public List<OrdemServico> listarOSPorPeriodo(Date dataInicio, Date dataFim) {
+        return ordemServicoDAO.buscarPorPeriodo(dataInicio, dataFim);
+    }
+    
+    public List<OrdemServico> listarOSPorNivel(String tipoNivel) {
+        return ordemServicoDAO.buscarPorNivel(tipoNivel);
+    }
+    
+    // MÉTODOS DE ESTATÍSTICAS
+    public int contarOrdensUltimos90Dias() {
+        Calendar cal = Calendar.getInstance();
+        Date dataFim = new Date();
+        cal.add(Calendar.DAY_OF_YEAR, -90);
+        Date dataInicio = cal.getTime();
+        return ordemServicoDAO.contarOrdensPorPeriodo(dataInicio, dataFim);
+    }
+    
+    public double calcularTempoMedioResolucaoUltimos90Dias() {
+        Calendar cal = Calendar.getInstance();
+        Date dataFim = new Date();
+        cal.add(Calendar.DAY_OF_YEAR, -90);
+        Date dataInicio = cal.getTime();
+        return ordemServicoDAO.calcularTempoMedioResolucao(dataInicio, dataFim);
+    }
+    
+    public Map<String, Integer> getEstatisticasPorMotivo() {
+        Map<String, Integer> estatisticas = new HashMap<>();
+        List<OrdemServico> todas = ordemServicoDAO.listarTodas();
+        
+        for (OrdemServico os : todas) {
+            String motivo = os.getMotivo();
+            if (motivo != null && motivo.length() > 30) {
+                motivo = motivo.substring(0, 30) + "...";
+            }
+            estatisticas.put(motivo, estatisticas.getOrDefault(motivo, 0) + 1);
+        }
+        
+        return estatisticas;
+    }
+    
+    public Map<String, Integer> getEstatisticasPorFalha() {
+        Map<String, Integer> estatisticas = new HashMap<>();
+        List<OrdemServico> fechadas = ordemServicoDAO.buscarPorStatus("FECHADA");
+        
+        for (OrdemServico os : fechadas) {
+            String falha = os.getFalhaIdentificada();
+            if (falha != null && !falha.isEmpty()) {
+                estatisticas.put(falha, estatisticas.getOrDefault(falha, 0) + 1);
+            }
+        }
+        
+        return estatisticas;
+    }
+    
+    public Map<String, Integer> getEstatisticasPorTipoOs() {
+        return ordemServicoDAO.getEstatisticasPorTipoOs();
+    }
+    
+    public Map<String, Integer> getEstatisticasPorDepartamento() {
+        Map<String, Integer> estatisticas = new HashMap<>();
+        List<OrdemServico> todas = ordemServicoDAO.listarTodas();
+        
+        for (OrdemServico os : todas) {
+            String dept = os.getDepartamentoOrigem();
+            if (dept != null) {
+                estatisticas.put(dept, estatisticas.getOrDefault(dept, 0) + 1);
+            }
+        }
+        
+        return estatisticas;
+    }
+    
+    public Map<String, Double> getEstatisticasInstalacoes() {
+        return ordemServicoDAO.getEstatisticasInstalacoes();
+    }
+    
+    // MÉTODOS DE LISTENERS
+    public void addOSListener(OSListener listener) {
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+    
+    public void removeOSListener(OSListener listener) {
+        listeners.remove(listener);
+    }
+    
+    private void notificarOSCriada(OrdemServico os) {
+        for (OSListener listener : listeners) {
+            listener.onOSCriada(os);
+        }
+    }
+    
+    private void notificarOSEscalada(OrdemServico os) {
+        for (OSListener listener : listeners) {
+            listener.onOSEscalada(os);
+        }
+    }
+    
+    private void notificarOSFechada(OrdemServico os) {
+        for (OSListener listener : listeners) {
+            listener.onOSFechada(os);
+        }
+    }
+    
+    public interface OSListener {
+        void onOSCriada(OrdemServico os);
+        void onOSEscalada(OrdemServico os);
+        void onOSFechada(OrdemServico os);
+    }
+}

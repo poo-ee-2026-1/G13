@@ -1,0 +1,849 @@
+// TelaTI.java - Versão completa com painel de estatísticas
+package com.monitoramento.ui;
+
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.model.Equipamento;
+import com.monitoramento.dao.OrdemServicoDAO;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import java.awt.*;
+import java.awt.event.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
+public class TelaTI extends JPanel {
+    private OrdemServicoDAO ordemServicoDAO;
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private OrdemServicoService osService;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOS;
+    private DefaultTableModel tableModel;
+    private JComboBox<String> comboFiltroStatus, comboFiltroNivel, comboTipoOsFiltro, comboClienteFiltro;
+    private JButton btnAbrirOS, btnEscalar, btnFecharOS, btnAtualizar, btnFiltrar, btnLimparFiltro;
+    private Timer timerAtualizacao;
+    private JLabel lblStatusInfo;
+    
+    // Componentes do painel de estatísticas
+    private JLabel lblTotalAbertas, lblTotalFechadas, lblTempoMedio, lblProximaOS;
+    
+    private static final String[] NIVEL_OPCOES = {"TODOS", "1º Nível", "2º Nível", "3º Nível"};
+    private static final String[] STATUS_OPCOES = {"TODAS", "ABERTA", "EM_ATENDIMENTO", "FECHADA"};
+    private static final String[] TIPOS_OS = {"TODOS", "INFORMACAO", "REPARO", "INSTALACAO", "ORCAMENTO"};
+    
+    private static final java.util.Map<String, String> TIPO_EXIBICAO = new java.util.HashMap<>();
+    static {
+        TIPO_EXIBICAO.put("INFORMACAO", "INFORMAÇÃO");
+        TIPO_EXIBICAO.put("REPARO", "REPARO");
+        TIPO_EXIBICAO.put("INSTALACAO", "INSTALAÇÃO");
+        TIPO_EXIBICAO.put("ORCAMENTO", "ORÇAMENTO");
+    }
+    
+    public TelaTI(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.ordemServicoDAO = new OrdemServicoDAO();
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        
+        try {
+            this.osService = Main.getOrdemServicoService();
+            if (this.osService == null) {
+                System.err.println("OrdemServicoService não disponível, usando DAO diretamente");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao obter OrdemServicoService: " + e.getMessage());
+            this.osService = null;
+        }
+        
+        if (!usuario.getFuncao().equals("Técnico") && 
+            !usuario.getFuncao().equals("Administrador") && 
+            !usuario.getFuncao().equals("Gerente")) {
+            JOptionPane.showMessageDialog(this, "Apenas Técnicos, Gerentes ou Administradores podem acessar o TI!");
+            return;
+        }
+        
+        initComponents();
+        carregarOrdens();
+        carregarClientesCombo();
+        
+        // Timer para atualizar estatísticas automaticamente
+        timerAtualizacao = new Timer(5000, e -> {
+            carregarOrdens();
+            atualizarEstatisticas();
+        });
+        timerAtualizacao.start();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        
+        JPanel painelStatus = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelStatus.setBackground(new Color(240, 248, 255));
+        painelStatus.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        lblStatusInfo = new JLabel("Sistema de OS - TI (REPARO) | Usuário: " + usuarioLogado.getNomeCompleto());
+        lblStatusInfo.setFont(new Font("Arial", Font.BOLD, 12));
+        lblStatusInfo.setForeground(new Color(0, 100, 0));
+        painelStatus.add(lblStatusInfo);
+        
+        // Painel de filtros - ordem corrigida: Status → Nível → Tipo → Cliente
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        // 1. Status
+        painelFiltros.add(new JLabel("Status:"));
+        comboFiltroStatus = new JComboBox<>(STATUS_OPCOES);
+        painelFiltros.add(comboFiltroStatus);
+        
+        // 2. Nível
+        painelFiltros.add(new JLabel("Nível:"));
+        comboFiltroNivel = new JComboBox<>(NIVEL_OPCOES);
+        painelFiltros.add(comboFiltroNivel);
+        
+        // 3. Tipo de OS
+        painelFiltros.add(new JLabel("Tipo:"));
+        comboTipoOsFiltro = new JComboBox<>(TIPOS_OS);
+        
+        comboTipoOsFiltro.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                String val = (String) value;
+                if (val != null && TIPO_EXIBICAO.containsKey(val)) {
+                    val = TIPO_EXIBICAO.get(val);
+                } else if ("TODOS".equals(val)) {
+                    val = "TODOS";
+                }
+                return super.getListCellRendererComponent(list, val, index, isSelected, cellHasFocus);
+            }
+        });
+        painelFiltros.add(comboTipoOsFiltro);
+        
+        // 4. Cliente
+        painelFiltros.add(new JLabel("Cliente:"));
+        comboClienteFiltro = new JComboBox<>();
+        comboClienteFiltro.setPreferredSize(new Dimension(250, 25));
+        painelFiltros.add(comboClienteFiltro);
+        
+        // 5. Botões
+        btnFiltrar = new JButton("Filtrar");
+        btnLimparFiltro = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarOrdens());
+        btnLimparFiltro.addActionListener(e -> {
+            comboFiltroStatus.setSelectedIndex(0);
+            comboFiltroNivel.setSelectedIndex(0);
+            comboTipoOsFiltro.setSelectedIndex(0);
+            comboClienteFiltro.setSelectedIndex(0);
+            carregarOrdens();
+        });
+        
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimparFiltro);
+        
+        // Tabela
+        String[] colunas = {"ID", "Cliente", "Tipo OS", "Nível", "Status", "Motivo", "Data Abertura", "Data Fechamento"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOS = new JTable(tableModel);
+        tabelaOS.setRowHeight(25);
+        tabelaOS.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        // Criar renderizador centralizado para todas as colunas
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        // Aplicar renderizador centralizado a todas as colunas
+        for (int i = 0; i < tabelaOS.getColumnCount(); i++) {
+            tabelaOS.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
+        
+        tabelaOS.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaOS.getColumnModel().getColumn(1).setPreferredWidth(200);
+        tabelaOS.getColumnModel().getColumn(2).setPreferredWidth(100);
+        tabelaOS.getColumnModel().getColumn(3).setPreferredWidth(80);
+        tabelaOS.getColumnModel().getColumn(4).setPreferredWidth(100);
+        tabelaOS.getColumnModel().getColumn(5).setPreferredWidth(300);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaOS);
+        
+        // Painel de botões
+        JPanel painelBotoes = new JPanel(new FlowLayout());
+        painelBotoes.setBorder(BorderFactory.createTitledBorder("Ações"));
+        
+        btnAbrirOS = new JButton("Abrir OS (REPARO)");
+        btnEscalar = new JButton("Escalar Nível");
+        btnFecharOS = new JButton("Fechar OS");
+        btnAtualizar = new JButton("Atualizar");
+        
+        btnAbrirOS.setBackground(new Color(60, 120, 60));
+        btnAbrirOS.setForeground(Color.WHITE);
+        btnAbrirOS.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnEscalar.setBackground(new Color(255, 140, 0));
+        btnEscalar.setForeground(Color.WHITE);
+        btnEscalar.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnFecharOS.setBackground(new Color(180, 60, 60));
+        btnFecharOS.setForeground(Color.WHITE);
+        btnFecharOS.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnAtualizar.setBackground(new Color(70, 130, 180));
+        btnAtualizar.setForeground(Color.WHITE);
+        
+        btnAbrirOS.addActionListener(e -> abrirOSManual());
+        btnEscalar.addActionListener(e -> escalarOrdem());
+        btnFecharOS.addActionListener(e -> fecharOrdem());
+        btnAtualizar.addActionListener(e -> {
+            carregarOrdens();
+            atualizarEstatisticas();
+        });
+        
+        tabelaOS.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                atualizarBotoes();
+            }
+        });
+        
+        painelBotoes.add(btnAbrirOS);
+        painelBotoes.add(btnEscalar);
+        painelBotoes.add(btnFecharOS);
+        painelBotoes.add(btnAtualizar);
+        
+        // Painel de instruções
+        JPanel painelInstrucoes = new JPanel();
+        painelInstrucoes.setBackground(new Color(240, 248, 255));
+        painelInstrucoes.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        JLabel lblInstrucoes = new JLabel("Instruções: Selecione uma OS na tabela para gerenciar. Use 'Escalar Nível' para 1º→2º→3º Nível.");
+        lblInstrucoes.setFont(new Font("Arial", Font.PLAIN, 11));
+        lblInstrucoes.setForeground(new Color(100, 100, 100));
+        painelInstrucoes.add(lblInstrucoes);
+        
+        // ========== PAINEL DE ESTATÍSTICAS (ADICIONADO) ==========
+        JPanel painelStats = criarPainelEstatisticas();
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        toolBar.setBackground(new Color(240, 240, 240));
+        
+        JButton btnRefresh = new JButton("Atualizar Tudo");
+        btnRefresh.addActionListener(e -> {
+            carregarOrdens();
+            atualizarEstatisticas();
+        });
+        
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        // Organizar layout - Tabela no centro, estatísticas à direita
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelStatus, BorderLayout.CENTER);
+        painelNorte.add(painelFiltros, BorderLayout.SOUTH);
+        
+        // SplitPane para colocar estatísticas à direita
+        JSplitPane splitPaneCentral = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        splitPaneCentral.setResizeWeight(0.7);
+        splitPaneCentral.setLeftComponent(scrollTabela);
+        splitPaneCentral.setRightComponent(painelStats);
+        
+        JPanel painelSul = new JPanel(new BorderLayout());
+        painelSul.add(painelBotoes, BorderLayout.NORTH);
+        painelSul.add(painelInstrucoes, BorderLayout.SOUTH);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(splitPaneCentral, BorderLayout.CENTER);
+        add(painelSul, BorderLayout.SOUTH);
+        
+        // Inicializar estatísticas
+        atualizarEstatisticas();
+    }
+    
+    /**
+     * Cria o painel de estatísticas - mesmo modelo do ST
+     */
+    private JPanel criarPainelEstatisticas() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Estatísticas"));
+        panel.setPreferredSize(new Dimension(280, 280));
+        
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridwidth = 2;
+        
+        // Título
+        JLabel lblTitulo = new JLabel("📊 ESTATÍSTICAS - TI", SwingConstants.CENTER);
+        lblTitulo.setFont(new Font("Arial", Font.BOLD, 13));
+        lblTitulo.setForeground(new Color(0, 0, 139));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(lblTitulo, gbc);
+        
+        // Separador
+        JSeparator separador = new JSeparator();
+        gbc.gridy = 1;
+        panel.add(separador, gbc);
+        
+        // OS Abertas
+        gbc.gridy = 2;
+        JPanel panelAbertas = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelAbertas.add(new JLabel("📋 OS Abertas:"));
+        lblTotalAbertas = new JLabel("0");
+        lblTotalAbertas.setFont(new Font("Arial", Font.BOLD, 16));
+        lblTotalAbertas.setForeground(new Color(0, 100, 0));
+        panelAbertas.add(lblTotalAbertas);
+        panel.add(panelAbertas, gbc);
+        
+        // OS Fechadas (90 dias)
+        gbc.gridy = 3;
+        JPanel panelFechadas = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelFechadas.add(new JLabel("✅ OS Fechadas (90 dias):"));
+        lblTotalFechadas = new JLabel("0");
+        lblTotalFechadas.setFont(new Font("Arial", Font.BOLD, 14));
+        lblTotalFechadas.setForeground(new Color(0, 100, 0));
+        panelFechadas.add(lblTotalFechadas);
+        panel.add(panelFechadas, gbc);
+        
+        // Tempo Médio de Resolução
+        gbc.gridy = 4;
+        JPanel panelTempo = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelTempo.add(new JLabel("⏱️ Tempo Médio Resolução:"));
+        lblTempoMedio = new JLabel("0.0 horas");
+        lblTempoMedio.setFont(new Font("Arial", Font.BOLD, 14));
+        lblTempoMedio.setForeground(new Color(0, 0, 139));
+        panelTempo.add(lblTempoMedio);
+        panel.add(panelTempo, gbc);
+        
+        // Próxima OS 1º Nível
+        gbc.gridy = 5;
+        JPanel panelProxima = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelProxima.add(new JLabel("➡️ Próxima OS 1º Nível:"));
+        lblProximaOS = new JLabel("Nenhuma");
+        lblProximaOS.setFont(new Font("Arial", Font.BOLD, 12));
+        lblProximaOS.setForeground(new Color(255, 140, 0));
+        panelProxima.add(lblProximaOS);
+        panel.add(panelProxima, gbc);
+        
+        // Separador final
+        gbc.gridy = 6;
+        panel.add(new JSeparator(), gbc);
+        
+        // Informação de atualização
+        JLabel lblAtualizacao = new JLabel("Atualização automática a cada 5 segundos", SwingConstants.CENTER);
+        lblAtualizacao.setFont(new Font("Arial", Font.ITALIC, 9));
+        lblAtualizacao.setForeground(Color.GRAY);
+        gbc.gridy = 7;
+        panel.add(lblAtualizacao, gbc);
+        
+        return panel;
+    }
+    
+    /**
+     * Atualiza as estatísticas do painel
+     */
+    private void atualizarEstatisticas() {
+        if (osService != null) {
+            // OS Abertas
+            List<OrdemServico> abertas = osService.listarOSAbertas();
+            lblTotalAbertas.setText(String.valueOf(abertas.size()));
+            
+            // OS Fechadas nos últimos 90 dias
+            int fechadas = osService.contarOrdensUltimos90Dias();
+            lblTotalFechadas.setText(String.valueOf(fechadas));
+            
+            // Tempo médio de resolução
+            double tempoMedio = osService.calcularTempoMedioResolucaoUltimos90Dias();
+            lblTempoMedio.setText(String.format("%.1f horas", tempoMedio));
+            
+            // Próxima OS do 1º Nível
+            OrdemServico proxima = osService.getProximaOSPrimeiroNivel();
+            if (proxima != null) {
+                lblProximaOS.setText("OS #" + proxima.getId());
+                Cliente cliente = clienteDAO.buscarPorId(proxima.getIdCliente());
+                lblProximaOS.setToolTipText(cliente != null ? cliente.getNomeExibicao() : "Cliente não encontrado");
+            } else {
+                lblProximaOS.setText("Nenhuma");
+                lblProximaOS.setToolTipText(null);
+            }
+        } else {
+            // Fallback usando DAO direto
+            List<OrdemServico> todas = ordemServicoDAO.listarTodas();
+            List<OrdemServico> abertas = todas.stream()
+                .filter(os -> "ABERTA".equals(os.getStatus()) || "EM_ATENDIMENTO".equals(os.getStatus()))
+                .toList();
+            lblTotalAbertas.setText(String.valueOf(abertas.size()));
+            
+            // Contar fechadas nos últimos 90 dias
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.add(java.util.Calendar.DAY_OF_YEAR, -90);
+            Date dataLimite = cal.getTime();
+            long fechadas = todas.stream()
+                .filter(os -> "FECHADA".equals(os.getStatus()) && 
+                             os.getDataFechamento() != null && 
+                             os.getDataFechamento().after(dataLimite))
+                .count();
+            lblTotalFechadas.setText(String.valueOf(fechadas));
+            
+            lblTempoMedio.setText("N/A");
+            
+            // Próxima OS do 1º Nível
+            OrdemServico proxima = todas.stream()
+                .filter(os -> "ABERTA".equals(os.getStatus()) && "1º Nível".equals(os.getTipoNivel()))
+                .findFirst()
+                .orElse(null);
+            if (proxima != null) {
+                lblProximaOS.setText("OS #" + proxima.getId());
+            } else {
+                lblProximaOS.setText("Nenhuma");
+            }
+        }
+    }
+    
+    private void carregarClientesCombo() {
+        comboClienteFiltro.removeAllItems();
+        comboClienteFiltro.addItem("TODOS");
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente c : clientes) {
+            comboClienteFiltro.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+    }
+    
+    private String getTipoExibicao(String tipo) {
+        return TIPO_EXIBICAO.getOrDefault(tipo, tipo);
+    }
+    
+    private String determinarTipoOs(OrdemServico os) {
+        if (os.getTipoOs() != null) {
+            return getTipoExibicao(os.getTipoOs());
+        }
+        if (os.isInstalacao()) return "INSTALAÇÃO";
+        if (os.isOrcamento()) return "ORÇAMENTO";
+        if (os.isInformacao()) return "INFORMAÇÃO";
+        if (os.isReparo()) return "REPARO";
+        return "SERVIÇO";
+    }
+    
+    private String formatarStatus(String status) {
+        if (status == null) return "---";
+        switch (status) {
+            case "ABERTA": return "ABERTA";
+            case "EM_ATENDIMENTO": return "EM ATENDIMENTO";
+            case "FECHADA": return "FECHADA";
+            default: return status;
+        }
+    }
+    
+    private void carregarOrdens() {
+        tableModel.setRowCount(0);
+        List<OrdemServico> ordens;
+        
+        if (osService != null) {
+            ordens = osService.listarTodasOS();
+        } else {
+            ordens = ordemServicoDAO.listarTodas();
+        }
+        
+        adicionarOrdensTabela(ordens);
+        lblStatusInfo.setText("Sistema de OS - TI (REPARO) | Total de OS: " + ordens.size() + " | Usuário: " + usuarioLogado.getNomeCompleto());
+    }
+    
+    private void filtrarOrdens() {
+        String status = (String) comboFiltroStatus.getSelectedItem();
+        String nivel = (String) comboFiltroNivel.getSelectedItem();
+        String tipoOsFiltro = (String) comboTipoOsFiltro.getSelectedItem();
+        String clienteSelecionado = (String) comboClienteFiltro.getSelectedItem();
+        
+        List<OrdemServico> ordens;
+        
+        if (osService != null) {
+            ordens = osService.listarTodasOS();
+        } else {
+            ordens = ordemServicoDAO.listarTodas();
+        }
+        
+        if (!"TODAS".equals(status)) {
+            ordens = ordens.stream()
+                .filter(os -> os.getStatus() != null && os.getStatus().equals(status))
+                .toList();
+        }
+        
+        if (!"TODOS".equals(nivel)) {
+            ordens = ordens.stream()
+                .filter(os -> os.getTipoNivel() != null && os.getTipoNivel().equals(nivel))
+                .toList();
+        }
+        
+        if (!"TODOS".equals(tipoOsFiltro)) {
+            ordens = ordens.stream()
+                .filter(os -> {
+                    String tipo = os.getTipoOs();
+                    if (tipo == null) return false;
+                    return tipo.equals(tipoOsFiltro);
+                })
+                .toList();
+        }
+        
+        if (clienteSelecionado != null && !"TODOS".equals(clienteSelecionado)) {
+            int idCliente = Integer.parseInt(clienteSelecionado.split(" - ")[0]);
+            ordens = ordens.stream()
+                .filter(os -> os.getIdCliente() == idCliente)
+                .toList();
+        }
+        
+        adicionarOrdensTabela(ordens);
+    }
+    
+    private void adicionarOrdensTabela(List<OrdemServico> ordens) {
+        tableModel.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        
+        for (OrdemServico os : ordens) {
+            Cliente cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            String tipoOs = determinarTipoOs(os);
+            String statusExibicao = formatarStatus(os.getStatus());
+            
+            Object[] row = {
+                os.getId(),
+                nomeCliente,
+                tipoOs,
+                os.getTipoNivel(),
+                statusExibicao,
+                os.getMotivo() != null ? (os.getMotivo().length() > 60 ? os.getMotivo().substring(0, 60) + "..." : os.getMotivo()) : "",
+                os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                os.getDataFechamento() != null ? sdf.format(os.getDataFechamento()) : ""
+            };
+            tableModel.addRow(row);
+        }
+        
+        if (tableModel.getRowCount() == 0) {
+            Object[] row = {"---", "Nenhum registro encontrado", "---", "---", "---", "---", "---", "---"};
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void atualizarBotoes() {
+        int row = tabelaOS.getSelectedRow();
+        boolean selecionado = row >= 0;
+        
+        if (selecionado) {
+            String status = (String) tableModel.getValueAt(row, 4);
+            String nivel = (String) tableModel.getValueAt(row, 3);
+            
+            btnAbrirOS.setEnabled(true);
+            btnEscalar.setEnabled(!"FECHADA".equals(status));
+            btnFecharOS.setEnabled(!"FECHADA".equals(status));
+            
+            if ("1º Nível".equals(nivel)) {
+                btnEscalar.setToolTipText("Escalar para 2º Nível");
+            } else if ("2º Nível".equals(nivel)) {
+                btnEscalar.setToolTipText("Escalar para 3º Nível");
+            } else if ("3º Nível".equals(nivel)) {
+                btnEscalar.setToolTipText("Já está no nível máximo");
+            }
+        } else {
+            btnAbrirOS.setEnabled(true);
+            btnEscalar.setEnabled(false);
+            btnFecharOS.setEnabled(false);
+            btnEscalar.setToolTipText("Selecione uma OS primeiro");
+        }
+    }
+    
+    private void abrirOSManual() {
+        List<Cliente> todosClientes = clienteDAO.listarTodos();
+        List<OrdemServico> ordensAbertas;
+        
+        if (osService != null) {
+            ordensAbertas = osService.listarOSAbertas();
+        } else {
+            ordensAbertas = ordemServicoDAO.buscarPorStatus("ABERTA");
+        }
+        
+        List<Cliente> clientesDisponiveis = todosClientes.stream()
+            .filter(c -> ordensAbertas.stream().noneMatch(os -> os.getIdCliente() == c.getId()))
+            .toList();
+        
+        if (clientesDisponiveis.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "⚠️ Todos os clientes já possuem uma OS aberta!\n" +
+                "Feche as OS existentes antes de abrir novas.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Abrir Ordem de Serviço - TI (REPARO)", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setSize(550, 480);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Cliente:*"), gbc);
+        
+        JComboBox<String> comboCliente = new JComboBox<>();
+        for (Cliente c : clientesDisponiveis) {
+            comboCliente.addItem(c.getId() + " - " + c.getNomeExibicao());
+        }
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        panel.add(comboCliente, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        panel.add(new JLabel("Motivo (REPARO):*"), gbc);
+        
+        JTextArea txtMotivo = new JTextArea(5, 35);
+        txtMotivo.setLineWrap(true);
+        txtMotivo.setWrapStyleWord(true);
+        JScrollPane scrollMotivo = new JScrollPane(txtMotivo);
+        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2;
+        panel.add(scrollMotivo, gbc);
+        
+        JLabel lblInfo = new JLabel("Esta OS será do tipo REPARO e pode ser escalada até 3º Nível", SwingConstants.CENTER);
+        lblInfo.setFont(new Font("Arial", Font.ITALIC, 11));
+        lblInfo.setForeground(Color.BLUE);
+        gbc.gridy = 2;
+        panel.add(lblInfo, gbc);
+        
+        JPanel botoesPanel = new JPanel(new FlowLayout());
+        JButton btnConfirmar = new JButton("Abrir OS (REPARO)");
+        JButton btnCancelar = new JButton("Cancelar");
+        
+        btnConfirmar.setBackground(new Color(60, 120, 60));
+        btnConfirmar.setForeground(Color.WHITE);
+        btnConfirmar.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnConfirmar.addActionListener(e -> {
+            if (comboCliente.getSelectedIndex() == -1) {
+                JOptionPane.showMessageDialog(dialog, "Selecione um cliente!");
+                return;
+            }
+            
+            String motivo = txtMotivo.getText().trim();
+            if (motivo.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Informe o motivo da OS!");
+                return;
+            }
+            
+            String selected = (String) comboCliente.getSelectedItem();
+            int idCliente = Integer.parseInt(selected.split(" - ")[0]);
+            
+            OrdemServico os;
+            if (osService != null) {
+                os = osService.abrirOSTI(idCliente, motivo, usuarioLogado.getId());
+            } else {
+                List<Equipamento> equipamentos = equipamentoDAO.buscarPorCliente(idCliente);
+                os = new OrdemServico();
+                os.setIdCliente(idCliente);
+                os.setIdEquipamento(equipamentos.isEmpty() ? 0 : equipamentos.get(0).getId());
+                os.setTipoNivel("1º Nível");
+                os.setStatus("ABERTA");
+                os.setMotivo(motivo);
+                os.setDataAbertura(new Date());
+                os.setIdUsuarioAbertura(usuarioLogado.getId());
+                os.setTipoOs("REPARO");
+                os.setDepartamentoOrigem("TI");
+                os.setTipoOrdem("SERVICO");
+                ordemServicoDAO.inserir(os);
+            }
+            
+            if (os != null && os.getId() > 0) {
+                JOptionPane.showMessageDialog(dialog, 
+                    "✅ OS #" + os.getId() + " (REPARO) aberta com sucesso!\n\n" +
+                    "Cliente: " + selected.split(" - ")[1] + "\n" +
+                    "Motivo: " + motivo);
+                dialog.dispose();
+                carregarOrdens();
+                atualizarEstatisticas();
+            } else {
+                JOptionPane.showMessageDialog(dialog, 
+                    "❌ Erro ao abrir OS!\nVerifique se o cliente já não possui uma OS aberta.", 
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+        btnCancelar.addActionListener(e -> dialog.dispose());
+        
+        botoesPanel.add(btnConfirmar);
+        botoesPanel.add(btnCancelar);
+        
+        dialog.add(panel, BorderLayout.CENTER);
+        dialog.add(botoesPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+    
+    private void escalarOrdem() {
+        int row = tabelaOS.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione uma OS para escalar!");
+            return;
+        }
+        
+        int idOS = (int) tableModel.getValueAt(row, 0);
+        String nivelAtual = (String) tableModel.getValueAt(row, 3);
+        String status = (String) tableModel.getValueAt(row, 4);
+        
+        if ("FECHADA".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Não é possível escalar uma OS já fechada!");
+            return;
+        }
+        
+        String proximoNivel = null;
+        if ("1º Nível".equals(nivelAtual)) {
+            proximoNivel = "2º Nível";
+        } else if ("2º Nível".equals(nivelAtual)) {
+            proximoNivel = "3º Nível";
+        } else if ("3º Nível".equals(nivelAtual)) {
+            JOptionPane.showMessageDialog(this, "⚠️ Esta OS já está no nível máximo (3º Nível)!\nNão é possível escalar além deste nível.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "📋 Escalar OS #" + idOS + "\n" +
+            "Nível atual: " + nivelAtual + "\n" +
+            "Novo nível: " + proximoNivel + "\n\n" +
+            "Deseja continuar?", 
+            "Confirmar Escalação", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            boolean sucesso;
+            
+            if (osService != null) {
+                if ("2º Nível".equals(proximoNivel)) {
+                    sucesso = osService.escalarParaSegundoNivel(idOS);
+                } else {
+                    sucesso = osService.escalarParaTerceiroNivel(idOS);
+                }
+            } else {
+                OrdemServico os = ordemServicoDAO.buscarPorId(idOS);
+                if (os != null) {
+                    os.setTipoNivel(proximoNivel);
+                    sucesso = ordemServicoDAO.atualizar(os);
+                } else {
+                    sucesso = false;
+                }
+            }
+            
+            if (sucesso) {
+                JOptionPane.showMessageDialog(this, 
+                    "✅ OS #" + idOS + " escalada com sucesso!\n" +
+                    "Novo nível: " + proximoNivel);
+                carregarOrdens();
+                atualizarEstatisticas();
+            } else {
+                JOptionPane.showMessageDialog(this, "❌ Erro ao escalar OS!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void fecharOrdem() {
+        int row = tabelaOS.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Selecione uma OS para fechar!");
+            return;
+        }
+        
+        int idOS = (int) tableModel.getValueAt(row, 0);
+        String status = (String) tableModel.getValueAt(row, 4);
+        
+        if ("FECHADA".equals(status)) {
+            JOptionPane.showMessageDialog(this, "Esta OS já está fechada!");
+            return;
+        }
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Descrição da Solução:*"), gbc);
+        JTextArea txtSolucao = new JTextArea(5, 35);
+        txtSolucao.setLineWrap(true);
+        txtSolucao.setWrapStyleWord(true);
+        JScrollPane scrollSolucao = new JScrollPane(txtSolucao);
+        gbc.gridy = 1;
+        panel.add(scrollSolucao, gbc);
+        
+        gbc.gridy = 2;
+        panel.add(new JLabel("Falha Identificada:*"), gbc);
+        JComboBox<String> comboFalha = new JComboBox<>(new String[]{
+            "CLIENTE", "MONITORAMENTO", "INSTALAÇÃO", "HARDWARE", "SOFTWARE", "REDE", "ENERGIA", "OUTRO"
+        });
+        gbc.gridy = 3;
+        panel.add(comboFalha, gbc);
+        
+        gbc.gridy = 4;
+        panel.add(new JLabel("Nível de dificuldade:"), gbc);
+        JComboBox<String> comboDificuldade = new JComboBox<>(new String[]{"BAIXA", "MÉDIA", "ALTA", "CRÍTICA"});
+        gbc.gridy = 5;
+        panel.add(comboDificuldade, gbc);
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Fechar Ordem de Serviço #" + idOS, 
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            String solucao = txtSolucao.getText().trim();
+            if (solucao.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Descrição da solução é obrigatória!");
+                return;
+            }
+            
+            String falha = (String) comboFalha.getSelectedItem();
+            String dificuldade = (String) comboDificuldade.getSelectedItem();
+            
+            String solucaoCompleta = "[Nível " + dificuldade + "] " + solucao + 
+                "\n\nDificuldade: " + dificuldade;
+            
+            boolean sucesso;
+            if (osService != null) {
+                sucesso = osService.fecharOrdemServico(idOS, solucaoCompleta, falha, usuarioLogado.getId());
+            } else {
+                sucesso = ordemServicoDAO.fecharOrdemServico(idOS, solucaoCompleta, falha, usuarioLogado.getId());
+            }
+            
+            if (sucesso) {
+                JOptionPane.showMessageDialog(this, 
+                    "✅ OS #" + idOS + " fechada com sucesso!\n\n" +
+                    "Falha: " + falha + "\n" +
+                    "Dificuldade: " + dificuldade);
+                carregarOrdens();
+                atualizarEstatisticas();
+            } else {
+                JOptionPane.showMessageDialog(this, "❌ Erro ao fechar OS!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (timerAtualizacao != null) {
+            timerAtualizacao.stop();
+        }
+    }
+}

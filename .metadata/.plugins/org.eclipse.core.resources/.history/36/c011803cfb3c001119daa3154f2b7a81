@@ -1,0 +1,251 @@
+package com.monitoramento.ui;
+
+import com.monitoramento.model.MovimentacaoEstoque;
+import com.monitoramento.model.ProdutoEstoque;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.MovimentacaoEstoqueDAO;
+import com.monitoramento.dao.ProdutoEstoqueDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.List;
+
+public class TelaMovimentacoesEstoque extends JPanel {
+    private MovimentacaoEstoqueDAO movimentacaoDAO;
+    private ProdutoEstoqueDAO produtoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaMovimentacoes;
+    private DefaultTableModel tableModel;
+    private JComboBox<String> comboTipo, comboMotivo;
+    private JTextField txtDataInicio, txtDataFim;
+    private JButton btnFiltrar, btnLimpar;
+    
+    // Labels para resumo
+    private JLabel lblTotalEntradas;
+    private JLabel lblTotalSaidas;
+    private JLabel lblSaldo;
+    
+    public TelaMovimentacoesEstoque(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.movimentacaoDAO = new MovimentacaoEstoqueDAO();
+        this.produtoDAO = new ProdutoEstoqueDAO();
+        
+        initComponents();
+        carregarMovimentacoes();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Painel de filtros
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtros"));
+        
+        painelFiltros.add(new JLabel("Tipo:"));
+        comboTipo = new JComboBox<>(new String[]{"TODAS", "ENTRADA", "SAIDA"});
+        
+        painelFiltros.add(new JLabel("Motivo:"));
+        comboMotivo = new JComboBox<>(new String[]{"TODOS", "COMPRA", "VENDA", "INSTALACAO", "DEVOLUCAO", "AJUSTE", "PERDA"});
+        
+        painelFiltros.add(new JLabel("Data Início:"));
+        txtDataInicio = new JTextField(10);
+        txtDataInicio.setToolTipText("dd/MM/yyyy");
+        
+        painelFiltros.add(new JLabel("Data Fim:"));
+        txtDataFim = new JTextField(10);
+        txtDataFim.setToolTipText("dd/MM/yyyy");
+        
+        btnFiltrar = new JButton("Filtrar");
+        btnLimpar = new JButton("Limpar");
+        
+        btnFiltrar.addActionListener(e -> filtrarMovimentacoes());
+        btnLimpar.addActionListener(e -> limparFiltros());
+        
+        painelFiltros.add(comboTipo);
+        painelFiltros.add(comboMotivo);
+        painelFiltros.add(txtDataInicio);
+        painelFiltros.add(txtDataFim);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnLimpar);
+        
+        // Tabela
+        String[] colunas = {"ID", "Data", "Produto", "Tipo", "Motivo", "Quantidade", "Valor Unitário", "Valor Total", "Usuário"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaMovimentacoes = new JTable(tableModel);
+        tabelaMovimentacoes.setRowHeight(25);
+        
+        tabelaMovimentacoes.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaMovimentacoes.getColumnModel().getColumn(1).setPreferredWidth(100);
+        tabelaMovimentacoes.getColumnModel().getColumn(2).setPreferredWidth(200);
+        tabelaMovimentacoes.getColumnModel().getColumn(3).setPreferredWidth(80);
+        tabelaMovimentacoes.getColumnModel().getColumn(4).setPreferredWidth(100);
+        tabelaMovimentacoes.getColumnModel().getColumn(5).setPreferredWidth(80);
+        tabelaMovimentacoes.getColumnModel().getColumn(6).setPreferredWidth(100);
+        tabelaMovimentacoes.getColumnModel().getColumn(7).setPreferredWidth(100);
+        tabelaMovimentacoes.getColumnModel().getColumn(8).setPreferredWidth(150);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaMovimentacoes);
+        
+        // Painel de resumo
+        JPanel painelResumo = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        painelResumo.setBorder(BorderFactory.createTitledBorder("Resumo"));
+        
+        lblTotalEntradas = new JLabel("Total Entradas: R$ 0,00");
+        lblTotalSaidas = new JLabel("Total Saídas: R$ 0,00");
+        lblSaldo = new JLabel("Saldo: R$ 0,00");
+        
+        lblTotalEntradas.setFont(new Font("Arial", Font.BOLD, 12));
+        lblTotalSaidas.setFont(new Font("Arial", Font.BOLD, 12));
+        lblSaldo.setFont(new Font("Arial", Font.BOLD, 14));
+        
+        lblTotalEntradas.setForeground(new Color(0, 100, 0));
+        lblTotalSaidas.setForeground(Color.RED);
+        
+        painelResumo.add(lblTotalEntradas);
+        painelResumo.add(Box.createHorizontalStrut(20));
+        painelResumo.add(lblTotalSaidas);
+        painelResumo.add(Box.createHorizontalStrut(20));
+        painelResumo.add(lblSaldo);
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnAtualizar = new JButton("Atualizar");
+        btnAtualizar.addActionListener(e -> carregarMovimentacoes());
+        
+        toolBar.add(btnAtualizar);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        // Organizar layout
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelFiltros, BorderLayout.CENTER);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(scrollTabela, BorderLayout.CENTER);
+        add(painelResumo, BorderLayout.SOUTH);
+    }
+    
+    private void carregarMovimentacoes() {
+        List<MovimentacaoEstoque> movimentacoes = movimentacaoDAO.listarTodas();
+        adicionarMovimentacoesTabela(movimentacoes);
+        atualizarResumo(movimentacoes);
+    }
+    
+    private void filtrarMovimentacoes() {
+        String tipo = (String) comboTipo.getSelectedItem();
+        String motivo = (String) comboMotivo.getSelectedItem();
+        
+        List<MovimentacaoEstoque> movimentacoes = movimentacaoDAO.listarTodas();
+        
+        if (!"TODAS".equals(tipo)) {
+            movimentacoes = movimentacoes.stream()
+                .filter(m -> m.getTipo() != null && m.getTipo().equals(tipo))
+                .toList();
+        }
+        
+        if (!"TODOS".equals(motivo)) {
+            movimentacoes = movimentacoes.stream()
+                .filter(m -> m.getMotivo() != null && m.getMotivo().equals(motivo))
+                .toList();
+        }
+        
+        // Filtrar por data
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        try {
+            if (!txtDataInicio.getText().trim().isEmpty()) {
+                java.util.Date dataInicio = sdf.parse(txtDataInicio.getText().trim());
+                movimentacoes = movimentacoes.stream()
+                    .filter(m -> m.getDataMovimento() != null && 
+                                (m.getDataMovimento().after(dataInicio) ||
+                                m.getDataMovimento().equals(dataInicio)))
+                    .toList();
+            }
+            
+            if (!txtDataFim.getText().trim().isEmpty()) {
+                java.util.Date dataFim = sdf.parse(txtDataFim.getText().trim());
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.setTime(dataFim);
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 23);
+                cal.set(java.util.Calendar.MINUTE, 59);
+                cal.set(java.util.Calendar.SECOND, 59);
+                dataFim = cal.getTime();
+                
+                movimentacoes = movimentacoes.stream()
+                    .filter(m -> m.getDataMovimento() != null && 
+                                m.getDataMovimento().before(dataFim))
+                    .toList();
+            }
+        } catch (Exception e) {
+            // Ignorar erro de data
+        }
+        
+        adicionarMovimentacoesTabela(movimentacoes);
+        atualizarResumo(movimentacoes);
+    }
+    
+    private void limparFiltros() {
+        comboTipo.setSelectedIndex(0);
+        comboMotivo.setSelectedIndex(0);
+        txtDataInicio.setText("");
+        txtDataFim.setText("");
+        carregarMovimentacoes();
+    }
+    
+    private void adicionarMovimentacoesTabela(List<MovimentacaoEstoque> movimentacoes) {
+        tableModel.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        
+        for (MovimentacaoEstoque m : movimentacoes) {
+            ProdutoEstoque produto = produtoDAO.buscarPorId(m.getIdProduto());
+            String nomeProduto = produto != null ? produto.getNomeCompleto() : "Produto ID: " + m.getIdProduto();
+            
+            String tipoExibicao = "ENTRADA".equals(m.getTipo()) ? "ENTRADA" : "SAÍDA";
+            String motivoExibicao = m.getMotivo();
+            
+            Object[] row = {
+                m.getId(),
+                m.getDataMovimento() != null ? sdf.format(m.getDataMovimento()) : "",
+                nomeProduto,
+                tipoExibicao,
+                motivoExibicao,
+                m.getQuantidade(),
+                String.format("R$ %.2f", m.getPrecoUnitario()),
+                String.format("R$ %.2f", m.getValorTotal()),
+                "Usuário ID: " + m.getIdUsuario()
+            };
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void atualizarResumo(List<MovimentacaoEstoque> movimentacoes) {
+        double totalEntradas = 0;
+        double totalSaidas = 0;
+        
+        for (MovimentacaoEstoque m : movimentacoes) {
+            if ("ENTRADA".equals(m.getTipo())) {
+                totalEntradas += m.getValorTotal();
+            } else {
+                totalSaidas += m.getValorTotal();
+            }
+        }
+        
+        double saldo = totalEntradas - totalSaidas;
+        
+        lblTotalEntradas.setText(String.format("Total Entradas: R$ %.2f", totalEntradas));
+        lblTotalSaidas.setText(String.format("Total Saídas: R$ %.2f", totalSaidas));
+        lblSaldo.setText(String.format("Saldo: R$ %.2f", saldo));
+        lblSaldo.setForeground(saldo >= 0 ? new Color(0, 100, 0) : Color.RED);
+    }
+}

@@ -1,0 +1,290 @@
+package com.monitoramento.ui;
+
+import com.monitoramento.model.Usuario;
+import com.monitoramento.service.MonitoramentoService;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class TelaPrincipal extends JFrame {
+    private Usuario usuarioLogado;
+    private MonitoramentoService monitoramentoService;
+    private JTabbedPane tabbedPane;
+    
+    private TelaMonitoramento telaMonitoramento;
+    
+    public TelaPrincipal(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.monitoramentoService = Main.getMonitoramentoService();
+        
+        initComponents();
+        configurarMenu();
+        setLocationRelativeTo(null);
+        
+        abrirMonitoramento();
+    }
+    
+    private void initComponents() {
+        setTitle("Sistema de Monitoramento de Tensão Elétrica - Usuário: " + usuarioLogado.getLogin());
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1400, 750);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+        
+        // Painel Superior
+        JPanel painelSuperior = new JPanel(new BorderLayout());
+        painelSuperior.setBackground(Color.LIGHT_GRAY);
+        
+        JLabel titulo = new JLabel("VOLTMONITOR - SISTEMA DE MONITORAMENTO DE TENSÃO ELÉTRICA", SwingConstants.CENTER);
+        titulo.setFont(new Font("Arial", Font.BOLD, 18));
+        titulo.setForeground(Color.BLUE);
+        
+        JLabel lblDataHora = new JLabel("", SwingConstants.RIGHT);
+        lblDataHora.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        
+        JLabel lblStatusConexao = new JLabel("● CONECTADO", SwingConstants.LEFT);
+        lblStatusConexao.setFont(new Font("Arial", Font.BOLD, 12));
+        lblStatusConexao.setForeground(Color.GREEN);
+        
+        painelSuperior.add(titulo, BorderLayout.CENTER);
+        painelSuperior.add(lblDataHora, BorderLayout.EAST);
+        painelSuperior.add(lblStatusConexao, BorderLayout.WEST);
+        
+        new Timer(1000, e -> {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+            lblDataHora.setText("Data/Hora: " + sdf.format(new java.util.Date()));
+        }).start();
+        
+        tabbedPane = new JTabbedPane();
+        
+        add(painelSuperior, BorderLayout.NORTH);
+        add(tabbedPane, BorderLayout.CENTER);
+        
+        JPanel painelInferior = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JLabel lblInfo = new JLabel("Sistema de Monitoramento de Tensão - Versão 1.0");
+        lblInfo.setFont(new Font("Arial", Font.PLAIN, 10));
+        painelInferior.add(lblInfo);
+        add(painelInferior, BorderLayout.SOUTH);
+    }
+    
+    private void configurarMenu() {
+        JMenuBar menuBar = new JMenuBar();
+        
+        // Menu Monitoração
+        JMenu menuMonitoracao = new JMenu("Monitoração");
+        JMenuItem menuMonitorarClientes = new JMenuItem("Monitorar Clientes");
+        menuMonitorarClientes.addActionListener(e -> abrirMonitoramento());
+        menuMonitoracao.add(menuMonitorarClientes);
+        menuBar.add(menuMonitoracao);
+        
+        // Menu Atendimento
+        JMenu menuAtendimento = new JMenu("Atendimento");
+        JMenuItem menuRegistrarSolicitacao = new JMenuItem("Registrar Solicitação");
+        menuRegistrarSolicitacao.addActionListener(e -> abrirAtendimento());
+        menuAtendimento.add(menuRegistrarSolicitacao);
+        menuBar.add(menuAtendimento);
+        
+        // Menu Suporte Técnico
+        JMenu menuSuporte = new JMenu("Suporte Técnico");
+        JMenuItem menuOrdemServicoST = new JMenuItem("Ordem de Serviço (ST)");
+        menuOrdemServicoST.addActionListener(e -> abrirOrdemServicoST());
+        menuSuporte.add(menuOrdemServicoST);
+        menuBar.add(menuSuporte);
+        
+        // Menu TI
+        JMenu menuTI = new JMenu("TI");
+        JMenuItem menuOrdemServicoTI = new JMenuItem("Ordem de Serviço (TI)");
+        menuOrdemServicoTI.addActionListener(e -> abrirOrdemServicoTI());
+        menuTI.add(menuOrdemServicoTI);
+        menuBar.add(menuTI);
+        
+        // Menu Vendas
+        JMenu menuVendas = new JMenu("Vendas");
+        JMenuItem menuOrcamento = new JMenuItem("Orçamento");
+        JMenuItem menuOrdemInstalacao = new JMenuItem("Ordem de Instalação (ST)");
+        menuOrcamento.addActionListener(e -> abrirOrcamento());
+        menuOrdemInstalacao.addActionListener(e -> abrirOrdemInstalacao());
+        menuVendas.add(menuOrcamento);
+        menuVendas.add(menuOrdemInstalacao);
+        menuBar.add(menuVendas);
+        
+        // Menu Cadastros
+        JMenu menuCadastros = new JMenu("Cadastros");
+        JMenuItem menuClientes = new JMenuItem("Clientes");
+        JMenuItem menuEquipamentos = new JMenuItem("Equipamentos");
+        JMenuItem menuDepartamentos = new JMenuItem("Departamentos");
+        JMenuItem menuFuncoes = new JMenuItem("Funções");
+        JMenuItem menuFuncionarios = new JMenuItem("Funcionários");
+        JMenuItem menuProdutos = new JMenuItem("Produtos");
+        
+        menuClientes.addActionListener(e -> abrirClientes());
+        menuEquipamentos.addActionListener(e -> abrirEquipamentos());
+        menuDepartamentos.addActionListener(e -> abrirDepartamentos());
+        menuFuncoes.addActionListener(e -> abrirFuncoes());
+        menuFuncionarios.addActionListener(e -> abrirRH());
+        menuProdutos.addActionListener(e -> abrirEstoque());
+        
+        menuCadastros.add(menuClientes);
+        menuCadastros.add(menuEquipamentos);
+        menuCadastros.addSeparator();
+        menuCadastros.add(menuDepartamentos);
+        menuCadastros.add(menuFuncoes);
+        menuCadastros.addSeparator();
+        menuCadastros.add(menuFuncionarios);
+        menuCadastros.add(menuProdutos);
+        menuBar.add(menuCadastros);
+        
+        // Menu Financeiro
+        JMenu menuFinanceiro = new JMenu("Financeiro");
+        JMenuItem menuTransacoes = new JMenuItem("Transações");
+        JMenuItem menuContasPagar = new JMenuItem("Contas à Pagar");
+        JMenuItem menuContasReceber = new JMenuItem("Contas à Receber");
+        JMenuItem menuResumoFinanceiro = new JMenuItem("Resumo Financeiro");
+        JMenuItem menuNovaTransacao = new JMenuItem("Nova Transação");
+        
+        menuTransacoes.addActionListener(e -> abrirFinanceiro(0));
+        menuContasPagar.addActionListener(e -> abrirFinanceiro(1));
+        menuContasReceber.addActionListener(e -> abrirFinanceiro(2));
+        menuResumoFinanceiro.addActionListener(e -> abrirFinanceiro(3));
+        menuNovaTransacao.addActionListener(e -> abrirFinanceiro(4));
+        
+        menuFinanceiro.add(menuTransacoes);
+        menuFinanceiro.add(menuContasPagar);
+        menuFinanceiro.add(menuContasReceber);
+        menuFinanceiro.add(menuResumoFinanceiro);
+        menuFinanceiro.add(menuNovaTransacao);
+        menuBar.add(menuFinanceiro);
+        
+        // Menu Relatórios
+        JMenu menuRelatorios = new JMenu("Relatórios");
+        JMenuItem menuRelOrdensServico = new JMenuItem("Ordens de Serviço");
+        JMenuItem menuRelMedicaoTensao = new JMenuItem("Medição de Tensão");
+        JMenuItem menuRelDisponibilidade = new JMenuItem("Disponibilidade");
+        JMenuItem menuRelEstatisticas = new JMenuItem("Estatísticas Gerais");
+        JMenuItem menuRelListas = new JMenuItem("Listas");
+        JMenuItem menuRelAtendimento = new JMenuItem("Atendimento");
+        JMenuItem menuRelVendas = new JMenuItem("Vendas");
+        JMenuItem menuRelFinanceiro = new JMenuItem("Financeiro");
+        JMenuItem menuRelTI = new JMenuItem("TI");
+        
+        menuRelOrdensServico.addActionListener(e -> abrirRelatorio(0));
+        menuRelMedicaoTensao.addActionListener(e -> abrirRelatorio(1));
+        menuRelDisponibilidade.addActionListener(e -> abrirRelatorio(2));
+        menuRelEstatisticas.addActionListener(e -> abrirRelatorio(3));
+        menuRelListas.addActionListener(e -> abrirRelatorio(4));
+        menuRelAtendimento.addActionListener(e -> abrirRelatorio(5));
+        menuRelVendas.addActionListener(e -> abrirRelatorio(6));
+        menuRelFinanceiro.addActionListener(e -> abrirRelatorio(7));
+        menuRelTI.addActionListener(e -> abrirRelatorio(8));
+        
+        menuRelatorios.add(menuRelOrdensServico);
+        menuRelatorios.add(menuRelMedicaoTensao);
+        menuRelatorios.add(menuRelDisponibilidade);
+        menuRelatorios.add(menuRelEstatisticas);
+        menuRelatorios.add(menuRelListas);
+        menuRelatorios.addSeparator();
+        menuRelatorios.add(menuRelAtendimento);
+        menuRelatorios.add(menuRelVendas);
+        menuRelatorios.add(menuRelFinanceiro);
+        menuRelatorios.add(menuRelTI);
+        menuBar.add(menuRelatorios);
+        
+        setJMenuBar(menuBar);
+    }
+    
+    private void abrirMonitoramento() {
+        if (telaMonitoramento == null) {
+            telaMonitoramento = new TelaMonitoramento(usuarioLogado);
+            tabbedPane.addTab("Monitorar Clientes", telaMonitoramento);
+        }
+        tabbedPane.setSelectedComponent(telaMonitoramento);
+    }
+    
+    private void abrirAtendimento() {
+        TelaAtendimento tela = new TelaAtendimento(usuarioLogado);
+        tabbedPane.addTab("Registrar Solicitação", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirOrdemServicoST() {
+        TelaOrdensServico tela = new TelaOrdensServico(usuarioLogado, Main.getOrdemServicoService());
+        tabbedPane.addTab("Ordem de Serviço (ST)", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirOrdemServicoTI() {
+        TelaTI tela = new TelaTI(usuarioLogado);
+        tabbedPane.addTab("Ordem de Serviço (TI)", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirOrcamento() {
+        TelaVendas tela = new TelaVendas(usuarioLogado);
+        tela.setSelectedTab("Orçamento");
+        tabbedPane.addTab("Orçamento", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirOrdemInstalacao() {
+        TelaVendas tela = new TelaVendas(usuarioLogado);
+        tela.setSelectedTab("Ordens de Instalação");
+        tabbedPane.addTab("Ordem de Instalação", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirClientes() {
+        TelaClientes tela = new TelaClientes(usuarioLogado);
+        tabbedPane.addTab("Clientes", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirEquipamentos() {
+        TelaEquipamentos tela = new TelaEquipamentos(usuarioLogado);
+        tabbedPane.addTab("Equipamentos", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirDepartamentos() {
+        TelaDepartamentos tela = new TelaDepartamentos(usuarioLogado);
+        tabbedPane.addTab("Departamentos", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirFuncoes() {
+        TelaFuncoes tela = new TelaFuncoes(usuarioLogado);
+        tabbedPane.addTab("Funções", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirRH() {
+        TelaRH tela = new TelaRH(usuarioLogado);
+        tabbedPane.addTab("Funcionários", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirEstoque() {
+        TelaEstoque tela = new TelaEstoque(usuarioLogado);
+        tabbedPane.addTab("Produtos", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirFinanceiro(int aba) {
+        TelaFinanceiro tela = new TelaFinanceiro(usuarioLogado);
+        if (aba >= 0 && aba < tela.getTabCount()) {
+            tela.setSelectedTab(aba);
+        }
+        tabbedPane.addTab("Financeiro", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+    
+    private void abrirRelatorio(int aba) {
+        TelaRelatorios tela = new TelaRelatorios(usuarioLogado, monitoramentoService);
+        if (aba >= 0 && aba < tela.getTabCount()) {
+            tela.setSelectedTab(aba);
+        }
+        tabbedPane.addTab("Relatórios", tela);
+        tabbedPane.setSelectedComponent(tela);
+    }
+}

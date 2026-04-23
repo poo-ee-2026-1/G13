@@ -1,0 +1,48 @@
+// OrdemServico.java
+package com.monitoramento.model;
+
+import java.util.Date;
+
+public class OrdemServico {
+    private int id;
+    private int idCliente;
+    private int idEquipamento;
+    private String tipoNivel; // "1º Nível", "2º Nível" ou "3º Nível"
+    private String status; // "ABERTA", "EM_ATENDIMENTO", "FECHADA"
+    private String motivo;
+    private String descricaoSolucao;
+    private String falhaIdentificada; // "CLIENTE", "MONITORAMENTO", "INSTALAÇÃO", "HARDWARE", "SOFTWARE"
+    private Date dataAbertura;
+    private Date dataFechamento;
+    private int idUsuarioAbertura;
+    private int idUsuarioFechamento;
+    
+    // Construtores
+    public OrdemServico() {}
+    
+    // Getters e Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public int getIdCliente() { return idCliente; }
+    public void setIdCliente(int idCliente) { this.idCliente = idCliente; }
+    public int getIdEquipamento() { return idEquipamento; }
+    public void setIdEquipamento(int idEquipamento) { this.idEquipamento = idEquipamento; }
+    public String getTipoNivel() { return tipoNivel; }
+    public void setTipoNivel(String tipoNivel) { this.tipoNivel = tipoNivel; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getMotivo() { return motivo; }
+    public void setMotivo(String motivo) { this.motivo = motivo; }
+    public String getDescricaoSolucao() { return descricaoSolucao; }
+    public void setDescricaoSolucao(String descricaoSolucao) { this.descricaoSolucao = descricaoSolucao; }
+    public String getFalhaIdentificada() { return falhaIdentificada; }
+    public void setFalhaIdentificada(String falhaIdentificada) { this.falhaIdentificada = falhaIdentificada; }
+    public Date getDataAbertura() { return dataAbertura; }
+    public void setDataAbertura(Date dataAbertura) { this.dataAbertura = dataAbertura; }
+    public Date getDataFechamento() { return dataFechamento; }
+    public void setDataFechamento(Date dataFechamento) { this.dataFechamento = dataFechamento; }
+    public int getIdUsuarioAbertura() { return idUsuarioAbertura; }
+    public void setIdUsuarioAbertura(int idUsuarioAbertura) { this.idUsuarioAbertura = idUsuarioAbertura; }
+    public int getIdUsuarioFechamento() { return idUsuarioFechamento; }
+    public void setIdUsuarioFechamento(int idUsuarioFechamento) { this.idUsuarioFechamento = idUsuarioFechamento; }
+}

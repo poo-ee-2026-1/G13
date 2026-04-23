@@ -1,0 +1,418 @@
+package com.monitoramento.service;
+
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.dao.EquipamentoDAO;
+import com.monitoramento.dao.MedicaoTensaoDAO;
+import com.monitoramento.model.Cliente;
+import com.monitoramento.model.Equipamento;
+import com.monitoramento.model.MedicaoTensao;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class MonitoramentoService {
+    private ClienteDAO clienteDAO;
+    private EquipamentoDAO equipamentoDAO;
+    private MedicaoTensaoDAO medicaoDAO;
+    
+    // Cache para dados em tempo real
+    private Map<Integer, DadosMonitoramento> dadosMonitoramento;
+    private Map<Integer, Timer> timersCliente;
+    private Map<Integer, Integer> contadorSemComunicacao;
+    
+    // Constantes
+    private static final long TIMEOUT_SEM_COMUNICACAO = 2500; // 2.5 segundos
+    private static final long INTERVALO_MEDICAO = 500; // 500 milissegundos
+    
+    // Callback para comunica��o com OrdemServicoService
+    private OrdemServicoCallback ordemServicoCallback;
+    
+    public MonitoramentoService() {
+        this.clienteDAO = new ClienteDAO();
+        this.equipamentoDAO = new EquipamentoDAO();
+        this.medicaoDAO = new MedicaoTensaoDAO();
+        this.dadosMonitoramento = new ConcurrentHashMap<>();
+        this.timersCliente = new ConcurrentHashMap<>();
+        this.contadorSemComunicacao = new ConcurrentHashMap<>();
+        
+        inicializarMonitoramento();
+    }
+    
+    private void inicializarMonitoramento() {
+        // Carregar todos os clientes em monitoramento
+        List<Cliente> clientesMonitorados = clienteDAO.listarPorMonitoramento(true);
+        
+        for (Cliente cliente : clientesMonitorados) {
+            iniciarMonitoramentoCliente(cliente.getId());
+        }
+    }
+    
+    public void iniciarMonitoramentoCliente(int idCliente) {
+        Cliente cliente = clienteDAO.buscarPorId(idCliente);
+        if (cliente == null || !cliente.isEmMonitoramento()) {
+            return;
+        }
+        
+        List<Equipamento> equipamentos = equipamentoDAO.buscarPorCliente(idCliente);
+        if (equipamentos.isEmpty()) {
+            System.err.println("Cliente " + idCliente + " n�o possui equipamento cadastrado");
+            return;
+        }
+        
+        Equipamento equipamento = equipamentos.get(0); // Pega o primeiro equipamento
+        
+        DadosMonitoramento dados = new DadosMonitoramento();
+        dados.setIdCliente(idCliente);
+        dados.setEquipamento(equipamento);
+        dados.setTensaoNominal(equipamento.getTensaoNominal());
+        dados.setUltimaMedicao(null);
+        dados.setUltimoRecebimento(null);
+        dados.setMenorTensao(Double.MAX_VALUE);
+        dados.setMaiorTensao(Double.MIN_VALUE);
+        dados.setContadorMedicoes(0);
+        dados.setContadorAtivo(0);
+        dados.setContadorInativo(0);
+        dados.setContadorSemComunicacao(0);
+        
+        dadosMonitoramento.put(idCliente, dados);
+        
+        // Iniciar timer para verificar timeout
+        Timer timer = new Timer(true);
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                verificarTimeoutCliente(idCliente);
+            }
+        }, TIMEOUT_SEM_COMUNICACAO, TIMEOUT_SEM_COMUNICACAO);
+        
+        timersCliente.put(idCliente, timer);
+        
+        System.out.println("Monitoramento iniciado para cliente ID: " + idCliente);
+    }
+    
+    public void pararMonitoramentoCliente(int idCliente) {
+        Timer timer = timersCliente.remove(idCliente);
+        if (timer != null) {
+            timer.cancel();
+        }
+        
+        dadosMonitoramento.remove(idCliente);
+        contadorSemComunicacao.remove(idCliente);
+        
+        System.out.println("Monitoramento parado para cliente ID: " + idCliente);
+    }
+    
+    public void receberMedicao(int idCliente, double tensao) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        
+        if (dados == null) {
+            System.err.println("Cliente " + idCliente + " n�o est� em monitoramento");
+            return;
+        }
+        
+        Date agora = new Date();
+        dados.setUltimaMedicao(tensao);
+        dados.setUltimoRecebimento(agora);
+        
+        // Atualizar menor e maior tens�o
+        if (tensao < dados.getMenorTensao()) {
+            dados.setMenorTensao(tensao);
+        }
+        if (tensao > dados.getMaiorTensao()) {
+            dados.setMaiorTensao(tensao);
+        }
+        
+        // Determinar estado da rede
+        String estadoRede;
+        if (tensao > 0) {
+            estadoRede = "ATIVO";
+            dados.incrementarContadorAtivo();
+        } else {
+            estadoRede = "INATIVO";
+            dados.incrementarContadorInativo();
+        }
+        
+        // Determinar situa��o da rede
+        String situacaoRede = determinarSituacaoRede(tensao, dados.getTensaoNominal());
+        
+        // Salvar medi��o no banco
+        MedicaoTensao medicao = new MedicaoTensao();
+        medicao.setIdCliente(idCliente);
+        medicao.setTensao(tensao);
+        medicao.setDataHora(agora);
+        medicao.setEstadoRede(estadoRede);
+        medicao.setSituacaoRede(situacaoRede);
+        
+        medicaoDAO.inserir(medicao);
+        
+        dados.incrementarContadorMedicoes();
+        
+        // Verificar necessidade de abrir OS autom�tica
+        verificarAberturaOSAutomatica(idCliente, tensao, situacaoRede);
+        
+        // Resetar contador de sem comunica��o
+        contadorSemComunicacao.put(idCliente, 0);
+    }
+    
+    private void verificarTimeoutCliente(int idCliente) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        
+        if (dados == null) return;
+        
+        Date agora = new Date();
+        Date ultimoRecebimento = dados.getUltimoRecebimento();
+        
+        if (ultimoRecebimento == null) {
+            // Nunca recebeu medi��o
+            dados.setEstadoRedeAtual("SEM COMUNICA��O");
+            dados.incrementarContadorSemComunicacao();
+            
+            int contador = contadorSemComunicacao.getOrDefault(idCliente, 0);
+            contador++;
+            contadorSemComunicacao.put(idCliente, contador);
+            
+            if (contador >= 2) { // 5 segundos (2 * 2.5s)
+                abrirOSAutomatica(idCliente, "SEM COMUNICA��O - Cliente n�o responde");
+                contadorSemComunicacao.put(idCliente, 0);
+            }
+        } else {
+            long diferenca = agora.getTime() - ultimoRecebimento.getTime();
+            
+            if (diferenca > TIMEOUT_SEM_COMUNICACAO) {
+                dados.setEstadoRedeAtual("SEM COMUNICA��O");
+                dados.incrementarContadorSemComunicacao();
+                
+                int contador = contadorSemComunicacao.getOrDefault(idCliente, 0);
+                contador++;
+                contadorSemComunicacao.put(idCliente, contador);
+                
+                if (contador >= 2) { // 5 segundos
+                    abrirOSAutomatica(idCliente, "SEM COMUNICA��O - Cliente n�o responde h� mais de 5 segundos");
+                    contadorSemComunicacao.put(idCliente, 0);
+                }
+            } else {
+                // Resetar contador se recebeu comunica��o
+                contadorSemComunicacao.put(idCliente, 0);
+                
+                // Atualizar estado baseado na �ltima tens�o
+                Double ultimaTensao = dados.getUltimaMedicao();
+                if (ultimaTensao != null && ultimaTensao > 0) {
+                    dados.setEstadoRedeAtual("ATIVO");
+                } else if (ultimaTensao != null && ultimaTensao == 0) {
+                    dados.setEstadoRedeAtual("INATIVO");
+                }
+            }
+        }
+    }
+    
+    private String determinarSituacaoRede(double tensao, double tensaoNominal) {
+        double diferenca = Math.abs(tensao - tensaoNominal);
+        
+        if (diferenca <= 1) {
+            return "NORMAL";
+        } else if (diferenca <= 3) {
+            return "ALERTA";
+        } else {
+            return "CR�TICO";
+        }
+    }
+    
+    private void verificarAberturaOSAutomatica(int idCliente, double tensao, String situacaoRede) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null) return;
+        
+        // Verificar estado INATIVO por mais de 5 segundos
+        if (tensao == 0) {
+            if (!dados.isNotificouInativo()) {
+                dados.setInicioEstadoInativo(new Date());
+                dados.setNotificouInativo(false);
+            } else {
+                Date agora = new Date();
+                long duracao = agora.getTime() - dados.getInicioEstadoInativo().getTime();
+                if (duracao >= 5000 && !dados.isOsAbertaInativo()) {
+                    abrirOSAutomatica(idCliente, "Tens�o INATIVA por mais de 5 segundos");
+                    dados.setOsAbertaInativo(true);
+                }
+            }
+        } else {
+            dados.setNotificouInativo(false);
+            dados.setOsAbertaInativo(false);
+        }
+        
+        // Verificar alertas consecutivos
+        if (situacaoRede.equals("ALERTA")) {
+            dados.incrementarContadorAlertasConsecutivos();
+            if (dados.getContadorAlertasConsecutivos() > 3 && !dados.isOsAbertaAlerta()) {
+                abrirOSAutomatica(idCliente, "M�ltiplos alertas consecutivos de tens�o");
+                dados.setOsAbertaAlerta(true);
+            }
+        } else {
+            dados.resetarContadorAlertasConsecutivos();
+            dados.setOsAbertaAlerta(false);
+        }
+        
+        // Verificar cr�ticos consecutivos
+        if (situacaoRede.equals("CR�TICO")) {
+            dados.incrementarContadorCriticosConsecutivos();
+            if (dados.getContadorCriticosConsecutivos() > 3 && !dados.isOsAbertaCritico()) {
+                abrirOSAutomatica(idCliente, "M�ltiplos n�veis cr�ticos consecutivos de tens�o");
+                dados.setOsAbertaCritico(true);
+            }
+        } else {
+            dados.resetarContadorCriticosConsecutivos();
+            dados.setOsAbertaCritico(false);
+        }
+    }
+    
+    private void abrirOSAutomatica(int idCliente, String motivo) {
+        System.out.println("[AUTO] Solicitando abertura de OS para cliente " + idCliente + ": " + motivo);
+        if (ordemServicoCallback != null) {
+            ordemServicoCallback.onAbrirOSAutomatica(idCliente, motivo);
+        }
+    }
+    
+    public DadosMonitoramento getDadosMonitoramento(int idCliente) {
+        return dadosMonitoramento.get(idCliente);
+    }
+    
+    public List<DadosMonitoramento> listarTodosDadosMonitoramento() {
+        return new ArrayList<>(dadosMonitoramento.values());
+    }
+    
+    public double calcularDisponibilidade(int idCliente) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados == null || dados.getContadorMedicoes() == 0) {
+            return 100.0;
+        }
+        
+        int totalMedicoes = dados.getContadorMedicoes();
+        int medicoesValidas = dados.getContadorAtivo();
+        
+        return (medicoesValidas * 100.0) / totalMedicoes;
+    }
+    
+    public void resetarDadosDisponibilidade(int idCliente) {
+        DadosMonitoramento dados = dadosMonitoramento.get(idCliente);
+        if (dados != null) {
+            dados.resetarContadoresDisponibilidade();
+        }
+    }
+    
+    public void setOrdemServicoCallback(OrdemServicoCallback callback) {
+        this.ordemServicoCallback = callback;
+    }
+    
+    public interface OrdemServicoCallback {
+        void onAbrirOSAutomatica(int idCliente, String motivo);
+    }
+    
+    // Classe interna para dados de monitoramento
+    public static class DadosMonitoramento {
+        private int idCliente;
+        private Equipamento equipamento;
+        private double tensaoNominal;
+        private Double ultimaMedicao;
+        private Date ultimoRecebimento;
+        private double menorTensao;
+        private double maiorTensao;
+        private String estadoRedeAtual;
+        
+        // Contadores para disponibilidade
+        private int contadorMedicoes;
+        private int contadorAtivo;
+        private int contadorInativo;
+        private int contadorSemComunicacao;
+        
+        // Controles para OS autom�tica
+        private int contadorAlertasConsecutivos;
+        private int contadorCriticosConsecutivos;
+        private Date inicioEstadoInativo;
+        private boolean notificouInativo;
+        private boolean osAbertaInativo;
+        private boolean osAbertaAlerta;
+        private boolean osAbertaCritico;
+        
+        // Getters e Setters
+        public int getIdCliente() { return idCliente; }
+        public void setContadorSemComunicacao(int i) {
+			// TODO Auto-generated method stub
+			
+		}
+		public void setContadorInativo(int i) {
+			// TODO Auto-generated method stub
+			
+		}
+		public void setContadorAtivo(int i) {
+			// TODO Auto-generated method stub
+			
+		}
+		public void setContadorMedicoes(int i) {
+			// TODO Auto-generated method stub
+			
+		}
+		public void setIdCliente(int idCliente) { this.idCliente = idCliente; }
+        
+        public Equipamento getEquipamento() { return equipamento; }
+        public void setEquipamento(Equipamento equipamento) { this.equipamento = equipamento; }
+        
+        public double getTensaoNominal() { return tensaoNominal; }
+        public void setTensaoNominal(double tensaoNominal) { this.tensaoNominal = tensaoNominal; }
+        
+        public Double getUltimaMedicao() { return ultimaMedicao; }
+        public void setUltimaMedicao(Double ultimaMedicao) { this.ultimaMedicao = ultimaMedicao; }
+        
+        public Date getUltimoRecebimento() { return ultimoRecebimento; }
+        public void setUltimoRecebimento(Date ultimoRecebimento) { this.ultimoRecebimento = ultimoRecebimento; }
+        
+        public double getMenorTensao() { return menorTensao; }
+        public void setMenorTensao(double menorTensao) { this.menorTensao = menorTensao; }
+        
+        public double getMaiorTensao() { return maiorTensao; }
+        public void setMaiorTensao(double maiorTensao) { this.maiorTensao = maiorTensao; }
+        
+        public String getEstadoRedeAtual() { return estadoRedeAtual; }
+        public void setEstadoRedeAtual(String estadoRedeAtual) { this.estadoRedeAtual = estadoRedeAtual; }
+        
+        public int getContadorMedicoes() { return contadorMedicoes; }
+        public void incrementarContadorMedicoes() { this.contadorMedicoes++; }
+        
+        public int getContadorAtivo() { return contadorAtivo; }
+        public void incrementarContadorAtivo() { this.contadorAtivo++; }
+        
+        public int getContadorInativo() { return contadorInativo; }
+        public void incrementarContadorInativo() { this.contadorInativo++; }
+        
+        public int getContadorSemComunicacao() { return contadorSemComunicacao; }
+        public void incrementarContadorSemComunicacao() { this.contadorSemComunicacao++; }
+        
+        public int getContadorAlertasConsecutivos() { return contadorAlertasConsecutivos; }
+        public void incrementarContadorAlertasConsecutivos() { this.contadorAlertasConsecutivos++; }
+        public void resetarContadorAlertasConsecutivos() { this.contadorAlertasConsecutivos = 0; }
+        
+        public int getContadorCriticosConsecutivos() { return contadorCriticosConsecutivos; }
+        public void incrementarContadorCriticosConsecutivos() { this.contadorCriticosConsecutivos++; }
+        public void resetarContadorCriticosConsecutivos() { this.contadorCriticosConsecutivos = 0; }
+        
+        public Date getInicioEstadoInativo() { return inicioEstadoInativo; }
+        public void setInicioEstadoInativo(Date inicioEstadoInativo) { this.inicioEstadoInativo = inicioEstadoInativo; }
+        
+        public boolean isNotificouInativo() { return notificouInativo; }
+        public void setNotificouInativo(boolean notificouInativo) { this.notificouInativo = notificouInativo; }
+        
+        public boolean isOsAbertaInativo() { return osAbertaInativo; }
+        public void setOsAbertaInativo(boolean osAbertaInativo) { this.osAbertaInativo = osAbertaInativo; }
+        
+        public boolean isOsAbertaAlerta() { return osAbertaAlerta; }
+        public void setOsAbertaAlerta(boolean osAbertaAlerta) { this.osAbertaAlerta = osAbertaAlerta; }
+        
+        public boolean isOsAbertaCritico() { return osAbertaCritico; }
+        public void setOsAbertaCritico(boolean osAbertaCritico) { this.osAbertaCritico = osAbertaCritico; }
+        
+        public void resetarContadoresDisponibilidade() {
+            this.contadorMedicoes = 0;
+            this.contadorAtivo = 0;
+            this.contadorInativo = 0;
+            this.contadorSemComunicacao = 0;
+        }
+    }
+}

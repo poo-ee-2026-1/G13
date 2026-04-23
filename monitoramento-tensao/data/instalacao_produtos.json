@@ -1,0 +1,9 @@
+[ {
+  "id" : 1,
+  "idOrdemInstalacao" : 7,
+  "idProduto" : 1,
+  "nomeProduto" : "Produto de Teste",
+  "quantidade" : 1,
+  "precoUnitario" : 10.0,
+  "subtotal" : 10.0
+} ]
