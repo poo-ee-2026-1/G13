@@ -1,3 +1,4 @@
+// UsuarioDAO.java
 package com.monitoramento.dao;
 
 import com.monitoramento.model.Usuario;

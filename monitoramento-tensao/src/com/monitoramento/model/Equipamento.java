@@ -1,3 +1,4 @@
+// Equipamento.java
 package com.monitoramento.model;
 
 public class Equipamento {

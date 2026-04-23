@@ -1,3 +1,4 @@
+// MedicaoTensao.java
 package com.monitoramento.model;
 
 import java.util.Date;

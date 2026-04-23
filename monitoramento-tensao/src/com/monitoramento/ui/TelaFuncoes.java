@@ -1,4 +1,4 @@
-// TelaFuncoes.java (Convertido para JPanel)
+// TelaFuncoes.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.Funcao;

@@ -1,4 +1,4 @@
-// TelaRelatorios.java (Convertido para JPanel)
+// TelaRelatorios.java
 package com.monitoramento.ui;
 
 import com.monitoramento.dao.*;

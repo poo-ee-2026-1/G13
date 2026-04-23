@@ -1,4 +1,4 @@
-// TelaTI.java - Versão com quadro de estatísticas e ordenação por ID
+// TelaTI.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.OrdemServico;

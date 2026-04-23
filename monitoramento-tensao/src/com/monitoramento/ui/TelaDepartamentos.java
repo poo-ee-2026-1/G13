@@ -1,4 +1,4 @@
-// TelaDepartamentos.java (Convertido para JPanel)
+// TelaDepartamentos.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.Departamento;

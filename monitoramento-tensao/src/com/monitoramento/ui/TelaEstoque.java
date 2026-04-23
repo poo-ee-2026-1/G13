@@ -1,4 +1,4 @@
-// TelaEstoque.java (JPanel - já está correto, apenas verificando)
+// TelaEstoque.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.ProdutoEstoque;

@@ -1,4 +1,4 @@
-// OrdemServicoDAO.java - VERSÃO COMPLETA CORRIGIDA
+// OrdemServicoDAO.java
 package com.monitoramento.dao;
 
 import com.monitoramento.model.OrdemServico;

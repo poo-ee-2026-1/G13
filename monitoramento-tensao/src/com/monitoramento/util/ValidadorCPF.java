@@ -1,3 +1,4 @@
+// ValidadorCPF.java
 package com.monitoramento.util;
 
 public class ValidadorCPF {
@@ -6,7 +7,7 @@ public class ValidadorCPF {
         
         if (cpf.length() != 11) return false;
         
-        // Verifica se todos os dígitos são iguais
+        // Verifica se todos os dï¿½gitos sï¿½o iguais
         boolean todosIguais = true;
         for (int i = 1; i < 11; i++) {
             if (cpf.charAt(i) != cpf.charAt(0)) {
@@ -16,7 +17,7 @@ public class ValidadorCPF {
         }
         if (todosIguais) return false;
         
-        // Calcula primeiro dígito verificador
+        // Calcula primeiro dï¿½gito verificador
         int soma = 0;
         for (int i = 0; i < 9; i++) {
             soma += (cpf.charAt(i) - '0') * (10 - i);
@@ -24,7 +25,7 @@ public class ValidadorCPF {
         int primeiroDigito = 11 - (soma % 11);
         if (primeiroDigito >= 10) primeiroDigito = 0;
         
-        // Calcula segundo dígito verificador
+        // Calcula segundo dï¿½gito verificador
         soma = 0;
         for (int i = 0; i < 10; i++) {
             soma += (cpf.charAt(i) - '0') * (11 - i);

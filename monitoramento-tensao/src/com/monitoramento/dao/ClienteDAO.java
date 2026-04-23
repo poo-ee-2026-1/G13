@@ -1,4 +1,4 @@
-// ClienteDAO.java - Versão completa e corrigida com diagnósticos
+// ClienteDAO.java
 package com.monitoramento.dao;
 
 import com.monitoramento.model.Cliente;

@@ -1,4 +1,4 @@
-// TelaOrdensServico.java - Versão completa com filtros e ordenação por ID
+// TelaOrdensServico.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.OrdemServico;

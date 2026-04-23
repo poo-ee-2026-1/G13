@@ -1,4 +1,4 @@
-// TelaAtendimento.java - CORRIGIDO: Fecha APENAS a OS de origem
+// TelaAtendimento.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.Atendimento;

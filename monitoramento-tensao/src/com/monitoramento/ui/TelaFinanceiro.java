@@ -1,4 +1,4 @@
-// TelaFinanceiro.java (Convertido para JPanel)
+// TelaFinanceiro.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.TransacaoFinanceira;

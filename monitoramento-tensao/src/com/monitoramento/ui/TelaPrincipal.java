@@ -1,4 +1,4 @@
-// TelaPrincipal.java - VERSÃO CORRIGIDA COM MAXIMIZADA
+// TelaPrincipal.java
 package com.monitoramento.ui;
 
 import com.monitoramento.model.Usuario;

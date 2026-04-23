@@ -1,4 +1,4 @@
-// Departamento.java (ATUALIZADO)
+// Departamento.java
 package com.monitoramento.model;
 
 public class Departamento {

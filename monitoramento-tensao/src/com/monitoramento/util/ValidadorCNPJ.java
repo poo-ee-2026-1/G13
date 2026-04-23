@@ -1,3 +1,4 @@
+// ValidadorCNPJ.java
 package com.monitoramento.util;
 
 public class ValidadorCNPJ {
@@ -6,7 +7,7 @@ public class ValidadorCNPJ {
         
         if (cnpj.length() != 14) return false;
         
-        // Verifica se todos os dígitos são iguais
+        // Verifica se todos os dï¿½gitos sï¿½o iguais
         boolean todosIguais = true;
         for (int i = 1; i < 14; i++) {
             if (cnpj.charAt(i) != cnpj.charAt(0)) {
@@ -16,7 +17,7 @@ public class ValidadorCNPJ {
         }
         if (todosIguais) return false;
         
-        // Calcula primeiro dígito verificador
+        // Calcula primeiro dï¿½gito verificador
         int[] peso1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
         int soma = 0;
         for (int i = 0; i < 12; i++) {
@@ -26,7 +27,7 @@ public class ValidadorCNPJ {
         if (primeiroDigito < 2) primeiroDigito = 0;
         else primeiroDigito = 11 - primeiroDigito;
         
-        // Calcula segundo dígito verificador
+        // Calcula segundo dï¿½gito verificador
         int[] peso2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
         soma = 0;
         for (int i = 0; i < 13; i++) {
