@@ -1189,7 +1189,7 @@ com o **IP Local** cadastrado no registro do cliente.
 ---
 ```
 
-## Verificação de Conexão
+### Verificação de Conexão
 
 ```
 ---
@@ -1205,7 +1205,7 @@ curl -X POST http://192.168.43.200:8080/api/voltage \
 ---
 ```
 
-## LEDs Indicadores no ESP32
+### LEDs Indicadores no ESP32
 
 ```
 ---
