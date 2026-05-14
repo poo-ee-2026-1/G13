@@ -1033,6 +1033,7 @@ Limitações:
 
 ```
 ---
+
 - **CPF**: algoritmo oficial com dígitos verificadores
 - **CNPJ**: algoritmo oficial com dígitos verificadores
 - **IP**: formato IPv4 padrão (xxx.xxx.xxx.xxx)
