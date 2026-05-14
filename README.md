@@ -812,7 +812,7 @@ Todos os dados são persistidos no diretório `data/` na raiz do projeto:
 ---
 ```
 
-## Funcionalidades
+## Módulos
 
 ```
 ---
@@ -870,10 +870,90 @@ Módulo de Relatórios
 ---
 ```
 
+## Funcionalidades
+
+### Controle de Acesso
+
+```
+---
+
+|-----------------|------------------------------------------------------------|
+| Função          | Permissões                                                 |
+|-----------------|------------------------------------------------------------|
+| Administrador   | Acesso total: cadastros, monitoração e suporte             |
+| Monitor         | Visualização da tela de monitoração e suporte de 1º nível  |
+| Técnico         | Visualização da tela de monitoração e suporte de 2º nível  |
+|-----------------|------------------------------------------------------------|
+
+---
+```
+
+### Tela Principal de Monitoração
+
+```
+---
+
+**Grade em tempo real com as seguintes colunas:**
+|-------------------|--------------------------------------------------|
+| Coluna            | Descrição                                        |
+|-------------------|--------------------------------------------------|
+| CLIENTE           | Nome do cliente                                  |
+| EQUIPAMENTO       | Modelo do equipamento                            |
+| ESTADO DA REDE    | ATIVO / INATIVO / SEM COMUNICAÇÃO                |
+| TENSÃO (V)        | Tensão atual recebida do ESP32                   |
+| MAIOR TENSÃO (V)  | Maior valor desde início da sessão               |
+| MENOR TENSÃO (V)  | Menor valor desde início da sessão               |
+| SITUAÇÃO DA REDE  | NORMAL / ALERTA / CRÍTICO                        |
+|-------------------|--------------------------------------------------|
+
+**Atalhos de Teclado:**
+
+- `ESC` → Sair do sistema
+- `F5`  → Atualizar dados manualmente
+- `F8`  → Pausar / Retomar monitoração
+- `F9`  → OS / Ordens de Serviço
+
+---
+```
+
+### Lógica de Estados
+
+```
+---
+
+**Estados da Rede:**
+
+- `● ATIVO` (verde) — ESP32 enviando dados + tensão > 0V
+- `⛔ INATIVO` (vermelho claro) — tensão = 0V
+- `⛔ SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2.5 segundos
+
+**Situação da Rede:** (baseada na tensão nominal do equipamento):
+
+- `✔ NORMAL` — tensão dentro de ±1V da nominal
+- `⚠ ALERTA` — tensão entre ±2V e ±3V da nominal
+- `✖ CRÍTICO` — tensão além de ±4V nominal (+ alerta sonoro)
+
+---
+```
+
+### Ordem de Serviço Automática
+
+```
+---
+
+OS é aberta automaticamente para o departamento de Monitoração, para reestabalecimento remoto. Caso não seja possível, deverá ser encaminhada para departamento de Suporte Técnico. Dados de monitoração deve apresentar pelo menos 1 dos 2 casos abaixo:
+
+- Estado da Rede = "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5 segundos
+- Mais de 3 ocorrências de "ALERTA" ou "CRÍTICO"
+
+---
+```
+
 ## Banco de Dados Persistente
 
 ```
 ---
+
 O sistema NÃO utiliza banco de dados relacional (MySQL/PostgreSQL). Em vez disso, utiliza armazenamento em arquivos JSON através da classe DatabaseConnection, que gerencia:
     Leitura/escrita de listas de objetos via Jackson (JSON)
     Geração automática de IDs sequenciais
@@ -918,67 +998,6 @@ Limitações:
 | Senha    | `admin123`   |
 | Função   | Administrador|
 |----------|--------------|
-
----
-```
-
-## Funcionalidades
-
-### Controle de Acesso
-
-|-----------------|------------------------------------------------------------|
-| Função          | Permissões                                                 |
-|-----------------|------------------------------------------------------------|
-| Administrador   | Acesso total: cadastros, monitoração e suporte             |
-| Monitor         | Visualização da tela de monitoração e suporte de 1º nível  |
-| Técnico         | Visualização da tela de monitoração e suporte de 2º nível  |
-|-----------------|------------------------------------------------------------|
-
-### Tela Principal de Monitoração
-
-**Grade em tempo real com as seguintes colunas:**
-|-------------------|--------------------------------------------------|
-| Coluna            | Descrição                                        |
-|-------------------|--------------------------------------------------|
-| CLIENTE           | Nome do cliente                                  |
-| EQUIPAMENTO       | Modelo do equipamento                            |
-| ESTADO DA REDE    | ATIVO / INATIVO / SEM COMUNICAÇÃO                |
-| TENSÃO (V)        | Tensão atual recebida do ESP32                   |
-| MAIOR TENSÃO (V)  | Maior valor desde início da sessão               |
-| MENOR TENSÃO (V)  | Menor valor desde início da sessão               |
-| SITUAÇÃO DA REDE  | NORMAL / ALERTA / CRÍTICO                        |
-|-------------------|--------------------------------------------------|
-
-**Atalhos de Teclado:**
-
-- `ESC` → Sair do sistema
-- `F5`  → Atualizar dados manualmente
-- `F8`  → Pausar / Retomar monitoração
-- `F9`  → OS / Ordens de Serviço
-
-### Lógica de Estados
-
-**Estados da Rede:**
-
-- `● ATIVO` (verde) — ESP32 enviando dados + tensão > 0V
-- `⛔ INATIVO` (vermelho claro) — tensão = 0V
-- `⛔ SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2.5 segundos
-
-**Situação da Rede:** (baseada na tensão nominal do equipamento):
-
-- `✔ NORMAL` — tensão dentro de ±1V da nominal
-- `⚠ ALERTA` — tensão entre ±2V e ±3V da nominal
-- `✖ CRÍTICO` — tensão além de ±4V nominal (+ alerta sonoro)
-
-### Ordem de Serviço Automática
-
-```
----
-
-OS é aberta automaticamente para o departamento de Monitoração, para reestabalecimento remoto. Caso não seja possível, deverá ser encaminhada para departamento de Suporte Técnico. Dados de monitoração deve apresentar pelo menos 1 dos 2 casos abaixo:
-
-- Estado da Rede = "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5 segundos
-- Mais de 3 ocorrências de "ALERTA" ou "CRÍTICO"
 
 ---
 ```
