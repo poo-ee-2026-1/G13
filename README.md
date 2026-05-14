@@ -769,6 +769,7 @@ ATIVO	  ✅ Sim (1s)	        ✅ Sim	                ✅ Sim
 
 Todos os dados são persistidos no diretório `data/` na raiz do projeto:
 
+|---------------------------------|------------------------------------------------|
 | Arquivo                         | Descrição                                      |
 |---------------------------------|------------------------------------------------|
 | `clientes.json`                 | Cadastro de clientes (PF/PJ)                   |
@@ -786,6 +787,7 @@ Todos os dados são persistidos no diretório `data/` na raiz do projeto:
 | `instalacao_produtos.json`      | Produtos utilizados em ordens de instalação    |
 | `reservas_produtos.json`        | Reservas de produtos para orçamentos aprovados |
 | `orcamentos.json`               | Orçamentos gerados (criado pela TelaOrcamento) |
+|---------------------------------|------------------------------------------------|
 
 **Exemplo de `clientes.json`:**
 ```json
@@ -909,11 +911,13 @@ Limitações:
 ```
 ---
 
+|----------|--------------|
 | Campo    | Valor        |
 |----------|--------------|
 | Login    | `admin`     |
 | Senha    | `admin123`   |
 | Função   | Administrador|
+|----------|--------------|
 
 ---
 ```
