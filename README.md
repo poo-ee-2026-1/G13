@@ -2,45 +2,60 @@
 
 ## Discentes: 
 
+```
+---
+
 - Emiliano Rodrigues Feliciano
 - Gabriel Henrique Oliveira Silva 
 - Elberty Borges de Oliveira
 
 ---
+```
 
 ## Visão Geral
 
-O VoltMonitor é um sistema java para monitoração de tensão elétrica em tempo real, com comunicação via WebSocket com placa ESP32 (Arduino) e sensor de tensão AC ZMPT101B. Inclui gestão de usuários, clientes, equipamentos, departamentos e geração automática de ordem de serviço para manutenção.
+```
+---
+O VoltMonitor é um sistema java para monitoração em tempo real de tensão elétrica, com comunicação via WebSocket com placa ESP32 (Arduino) e sensor de tensão AC ZMPT101B. Inclui gestão de usuários, clientes, equipamentos, departamentos, atendimentos e geração automática de ordem de serviço para manutenção.
 
-Desde 2012, com a publicação da Resolução Normativa nº 482 pela ANEEL, que permitiu aos consumidores instalarem pequenos sistemas e compensarem o excedente de energia na rede, observamos aumento significativo de estações fotovoltaicas de geração de energia elétrica. Normalmente o sistema é gerenciado diretamente pelo cliente (sem conhecimento técnico) ou por técnico especializado no local de instalação. Para que o sistema não seja sobrecarregado com tensão fora do padrão (diferente de 220V), é necessário que a tensão elétrica se mantenha dentro de limites pré-definidos. Neste projeto, gerenciaremos remotamente a tensão elétrica no sistema simulado de placa fotovoltaica.
+Com a publicação da Resolução Normativa nº 482 de 2012 pela ANEEL, que permitiu aos consumidores instalarem pequenos sistemas e compensarem o excedente de energia na rede, observamos aumento significativo de estações fotovoltaicas de geração de energia elétrica. Normalmente o sistema é gerenciado diretamente pelo cliente (sem conhecimento técnico) ou por técnico especializado no local de instalação. Para que o sistema não seja sobrecarregado com tensão fora do padrão (muito diferente de 220V), é necessário que a tensão elétrica se mantenha dentro de limites pré-definidos. Neste projeto, gerenciaremos remotamente a tensão elétrica no sistema simulado de geração de energia elétrica por placa fotovoltaica.
 
-Com o objetivo de facilitar este monitoramento, será implementado software e hardware para medição de tensão de geração simulada e transmissão via wireless para central de processamento. Será considerada tensão dentro do padrão quando a mesma se manter entre 219V (mínimo) e 221V (máximo).
+Com o objetivo de facilitar este monitoramento, será implementado software e hardware para medição de tensão elétrica de geração simulada e transmissão dos dados via wireless para central de processamento. Será considerada tensão elétrca dentro do padrão quando a mesma se manter entre 219V (mínimo) e 221V (máximo).
 
 ---
+```
 
 ## Requisitos
 
+```
+---
 O servidor contará com as seguintes funcionalidades:
 
-a) Incluir e excluir cadastro de usuários (com nome, sobrenome, CPF, matrícula, função, login e senha pessoal que deverá ser digitada antes de entrar no sistema de monitoração. Somente usuários com função de "Administrador" poderá incluir e excluir qualquer cadastro. Usuários com a função de "Monitor" poderão visualizar as informações da tela principal de monitoração de clientes além de abrir e fechar Ordem de Serviço de 1º nível (reestabelecimento remoto). Usuários com a função de "Técnico" poderão visualizar as informações da tela principal de monitoração de clientes e abrir e fechar Ordem de Serviço de 2º nível (reestabelecimento presencial).
+a) Incluir e excluir cadastro de usuários (com nome, sobrenome, CPF, matrícula, função, login e senha pessoal que deverá ser digitada antes de entrar no sistema de monitoração. Usuários com a função de "Monitor" poderão visualizar somente as informações da tela principal de monitoração de clientes além de abrir e fechar Ordem de Serviço de 1º nível (reestabelecimento remoto). Usuários com a função de "Técnico" poderão somente visualizar as informações da tela principal de monitoração de clientes e abrir e fechar Ordem de Serviço de 2º nível (reestabelecimento presencial).
 
-b) Incluir e excluir cadastro de clientes (com identificação interna - ID, CPF para pessoa físíca ou CNPJ para pessoa jurídica (com validação de CPF ou CNPJ digitado corretamente), nome e sobrenome para pessoa física ou razão social e nome fantasia para pessoa jurídica, endereço (incluindo logradouro, número, bairro, cidade, estado, CEP), telefone (incluindo DDD com 2 dígitos numéricos e número com 9 dígitos dígitos numéricos. Deverá aceitar apenas números e limitar a quantidade de números do DDD para até 2 dígitos e número para até 9 dígitos), IP do cliente com formato padrão.
+b) Incluir e excluir cadastro de clientes (com identificação interna - ID, CPF para pessoa físíca ou CNPJ para pessoa jurídica (com validação de CPF ou CNPJ digitado corretamente), nome e sobrenome para pessoa física ou razão social e nome fantasia para pessoa jurídica, endereço (incluindo logradouro, número, bairro, cidade, estado, CEP), telefone (incluindo DDD com 2 dígitos numéricos e número com 9 dígitos dígitos numéricos. Deverá aceitar apenas números e limitar a quantidade de números do DDD para até 2 dígitos e número para até 9 dígitos) e IP do cliente com validação de formato padrão.
 
 c) Incluir e excluir cadastro de equipamento (com marca, modelo e tensão nominal. Marca e modelo poderão conter letras, números e caracteres especiais e tensão contendo apenas números maior ou igual 1 e menor ou igual a 380).
 
-d) Incluir ou excluir cliente da lista de monitoração.
+d) Incluir ou excluir clientes da lista de monitoração.
 
 e) Incluir e excluir cadastro de departamentos da empresa. Inicialmente será incluídos os seguintes departamentos: Administração, Monitoração, Suporte Técnico, Vendas e Financeiro.
 
-f) Relatórios de Usuários, Clientes, Equipamentos, Ordens de Serviço e Disponibilidade da Tensão elétrica do cliente de até 90 dias.
+f) Relatórios de Usuários, Clientes, Equipamentos, Ordens de Serviço e Disponibilidade da tensão elétrica do cliente de até 90 dias.
+
+g) Somente usuários com função de "Administrador" poderão incluir e excluir qualquer cadastro. Todos os outros usuários poderão apenas visualizar cadastros.
 
 ---
+```
 
 ## Operação
 
+```
+---
+
 A tela principal do sistema de monitoração terá layout de grade com colunas "CLIENTE", "EQUIPAMENTO", "ESTADO DA REDE", "TENSÃO (V)", "MAIOR TENSÃO (V)", "MENOR TENSÃO (V)", "SITUAÇÃO DA REDE" e "DISPONIBILIDADE", além de atalhos para sair do sistema "ESC", atualizar dados de monitoração "F5", pausar dados monitoração "F8", ordens de serviço "F9" e data e hora local.
 
-Na coluna "CLIENTE", deverá mostrar nome e ID ou razão social e ID do cliente.
+Na coluna "CLIENTE", deverá mostrar nome ou razão social e ID do cliente.
 
 Na coluna "EQUIPAMENTO", deverá mostrar o modelo do equipamento do cliente.
 
@@ -60,16 +75,18 @@ Na coluna "SITUAÇÃO DA REDE", deverá mostrar mensagem da situação da rede:
  b) "ALERTA" na cor amarelo caso a medida de tensão recebida pelo servidor seja entre [maior ou igual a ("TENSAO_NOMINAL"-2) volts e menor ou igual a ("TENSAO_NOMINAL"+2) volts] e [maior ou igual a ("TENSAO_NOMINAL"-3) volts] e [menor ou igual a ("TENSAO_NOMINAL"+3) volts],
  c) "CRÍTICO" na cor vermelho e emitir alerta sonoro caso a medida de tensão recebida pelo servidor seja entre [maior ou igual a 0 volts e menor ou igual a ("TENSAO_NOMINAL"-4) volts] ou [maior ou igual a ("TENSAO_NOMINAL"+4) volts].
 	
-O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medida da tensão do cliente recebida pelo servidor apresentar "ESTADO DA REDE" igual a "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5000 milisegundos, ou valores da "SITUAÇÃO DA REDE" apresentar "MENOR TENSÃO (V)" ou "MAIOR TENSÃO (V)" mais que 3 mensagens de "ALERTA" ou "CRÍTICO". A Ordem de Serviço deve ser encaminhada para usuário "Monitor" de 1º nível para reestabelecimento remoto. Caso não seja possível, deverá ser encaminhada para área de Suporte Técnico e tratada pelo usuário "Suporte" de 2º nível para reestabelecimento presencial. Deverá ser fechada com a descrição da solução e especificar se ponto de falha encontrada foi no cliente ou no serviço de monitoração.
+O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medida da tensão do cliente recebida pelo servidor apresentar "ESTADO DA REDE" igual a "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5000 milisegundos, ou valores da "SITUAÇÃO DA REDE" apresentar "MENOR TENSÃO (V)" ou "MAIOR TENSÃO (V)" mais que 3 mensagens de "ALERTA" ou "CRÍTICO". A Ordem de Serviço deve ser encaminhada para Suporte Técnico, usuário "Monitor" de 1º nível para reestabelecimento remoto. Caso não seja possível restabelecer serviço remotamente, deverá ser encaminhada para área de Suporte Técnico e tratada pelo usuário "Suporte" de 2º nível para reestabelecimento presencial. Deverá ser fechada com a descrição da solução e especificar se ponto de falha encontrada foi no cliente ou no serviço de monitoração.
 	
 ---
+```
 
 ## Arquitetura do Sistema
 
 ```
 ---
+
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                                    VISÃO GERAL                                        │
+│                                    VISÃO GERAL                                      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
                                     ┌─────────────────┐
@@ -80,29 +97,29 @@ O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medi
                                              │ /api/voltage
                                              ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              CAMADA DE APRESENTAÇÃO (VIEW)                           │
+│                              CAMADA DE APRESENTAÇÃO (VIEW)                          │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐ │
 │  │TelaLogin     │ │TelaPrincipal │ │TelaMonitora- │ │TelaClientes  │ │TelaOrdens- │ │
-│  │              │ │              │ │mento         │ │              │ │Servico      │ │
+│  │              │ │              │ │mento         │ │              │ │Servico     │ │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘ │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐ │
 │  │TelaEstoque   │ │TelaFinanceiro│ │TelaRH        │ │TelaOrcamento │ │TelaRelato- │ │
 │  │              │ │              │ │              │ │              │ │rios        │ │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘ │
 │                                                                                     │
-│  Framework: Java Swing (JFrame, JPanel, JTable, JTabbedPane, JMenuBar)            │
-│  Comunicação entre telas: Callbacks, Listeners, Timer para atualizações periódicas │
+│  Framework: Java Swing (JFrame, JPanel, JTable, JTabbedPane, JMenuBar)              │
+│  Comunicação entre telas: Callbacks, Listeners, Timer para atualizações periódicas  │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                               │
                                               │ Chamadas de métodos
                                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              CAMADA DE CONTROLE (CONTROLLER)                         │
+│                              CAMADA DE CONTROLE (CONTROLLER)                        │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         MonitoramentoService                                  │   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         MonitoramentoService                                 │   │
 │  │  • Gerencia timers de verificação por cliente                                 │   │
 │  │  • Processa medições recebidas do ESP32                                       │   │
 │  │  • Controla estado PAUSADO/ATIVO                                              │   │
@@ -643,9 +660,13 @@ VOLTMONITOR/
 │ - verDetalhesProduto()                  │       │ + criarPainelContasPagar()              │
 └─────────────────────────────────────────┘       │ + criarPainelContasReceber()            │
                                                   └─────────────────────────────────────────┘
-
+---
+```
 ### Legenda de Relacionamentos
 
+```
+---
+|---------|-------------|
 | Símbolo | Significado |
 |---------|-------------|
 | `─────►` | Associação / Dependência |
@@ -654,9 +675,14 @@ VOLTMONITOR/
 | `◇─────` | Agregação (parte-todo fraca) |
 | `1` / `*` | Multiplicidade (um / muitos) |
 
+---
+```
+
 ### Observações
 
-1. **MonitoramentoService.DadosMonitoramento** é uma classe interna (inner class) que encapsula os dados de monitoramento de cada cliente em tempo real.
+```
+´´´´
+1. *MonitoramentoService.DadosMonitoramento** é uma classe interna (inner class) que encapsula os dados de monitoramento de cada cliente em tempo real.
 
 2. **OrdemServicoService** implementa a interface `OrdemServicoCallback` para receber callbacks do `MonitoramentoService` quando uma OS precisa ser aberta automaticamente.
 
@@ -925,7 +951,7 @@ Módulo de Relatórios
 
 - `● ATIVO` (verde) — ESP32 enviando dados + tensão > 0V
 - `⛔ INATIVO` (vermelho claro) — tensão = 0V
-- `⛔ SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2.5 segundos
+- `⛔ SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2500 milisegundos
 
 **Situação da Rede:** (baseada na tensão nominal do equipamento):
 
@@ -941,9 +967,9 @@ Módulo de Relatórios
 ```
 ---
 
-OS é aberta automaticamente para o departamento de Monitoração, para reestabalecimento remoto. Caso não seja possível, deverá ser encaminhada para departamento de Suporte Técnico. Dados de monitoração deve apresentar pelo menos 1 dos 2 casos abaixo:
+OS é aberta automaticamente pelo departamento de Monitoração para reestabalecimento remoto. Caso não seja possível, deverá ser encaminhada para departamento de Suporte Técnico. Dados de monitoração deve apresentar pelo menos 1 dos 2 casos abaixo:
 
-- Estado da Rede = "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5 segundos
+- Estado da Rede = "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5000 milisegundos
 - Mais de 3 ocorrências de "ALERTA" ou "CRÍTICO"
 
 ---
@@ -978,7 +1004,8 @@ Limitações:
 
 - **Java** (JDK)
 - **Maven**
-- Placa **ESP32** com sensor de tensão ZMPT101B.
+- Placa **ESP32**
+- **Sensor** de tensão ZMPT101B
 - **Fonte** de tensão 220V
 - **Roteador** A930H
 - Computador - **Servidor Local**
@@ -1010,28 +1037,101 @@ Limitações:
 - **CNPJ**: algoritmo oficial com dígitos verificadores
 - **IP**: formato IPv4 padrão (xxx.xxx.xxx.xxx)
 - **Telefone**: DDD com exatamente 2 dígitos numéricos, número com exatamente 9 dígitos
-- **Tensão nominal**: entre 1V e 1500V
+- **Tensão nominal**: entre 1V e 380V
 
 ---
 ```
 
 ## Configuração do ESP32
 
+### Alimentação do ESP32 via USB
+
+```
+---
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    Alimentação USB (5V)                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Computador / USB Charger                                      │
+│         │                                                       │
+│         │ USB Cable                                             │
+│         ▼                                                       │
+│   ┌──────────┐                                                  │
+│   │  ESP32   │                                                  │
+│   │          │                                                  │
+│   │  USB ───►│──► Regulador Interno ──► 3.3V ──► Sensor         │
+│   │  (5V)    │    (AMS1117-3.3)                                 │
+│   └──────────┘                                                  │
+│                                                                 │
+│   ⚠️ ATENÇÃO:                                                   │
+│   • O pino VIN do ESP32 aceita 5V direto (via USB ou pino VIN)  │
+│   • O pino 3.3V é SAÍDA do regulador interno (máx 300mA)        │
+│   • O ZMPT101B pode ser alimentado pelos 3.3V do ESP32          │
+│   • Não aplicar tensão externa no pino 3.3V                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+---
+```
+
 ### Hardware
 
 ```
 ---
 
-Para medir tensões acima de 3.3V com o ADC do ESP32:
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          ESP32 - Módulo ZMPT101B                                     │
+│                     (Medição de Tensão AC - 110V/220V)                               │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 
-Fonte 19V ──┬── R1 (150kΩ) ──┬── GND
-            │                │
-            │              GPIO34 (ADC)
-            │                │
-            └── R2 (27kΩ) ───┘
+   ┌─────────────────┐                    ┌─────────────────┐
+   │      ESP32      │                    │    ZMPT101B     │
+   │                 │                    │   (Módulo AC)   │
+   │             3.3V│◄───────────────────┤VCC              │
+   │                 │                    │                 │
+   │             GND │◄───────────────────┤GND              │
+   │                 │                    │                 │
+   │   GPIO34 (ADC)  │◄───────────────────┤OUT (Sinal)      │
+   │                 │                    │                 │
+   │         USB 5V  │════════════════════│─── (Alimentação │
+   │     (Alimentação)│                    │     separada)   │
+   └─────────────────┘                    └────────┬────────┘
+                                                    │
+                                                    │ Entrada AC
+                                                    ▼
+                                            ┌─────────────────┐
+                                            │   Rede Elétrica │
+                                            │   110V ou 220V  │
+                                            │     (~50-60Hz)  │
+                                            └─────────────────┘
+---
+```
 
-Fator de divisão: `(R1+R2)/R2 = 177k/27k ≈ 6.556`
-Tensão máxima medida: `3.3V × 6.556 ≈ 21.6V`
+### Segurança
+
+```
+---
+
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║                              ⚠️  ATENÇÃO - SEGURANÇA  ⚠️                           ║
+╠═══════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                   ║
+║   1. O ZMPT101B possui ISOLAMENTO GALVÂNICO (transformador)                      ║
+║      → A parte de alta tensão é isolada do ESP32                                 ║
+║                                                                                   ║
+║   2. NUNCA toque nos terminais AC enquanto o circuito estiver energizado         ║
+║                                                                                   ║
+║   3. Utilize fiação adequada para 220V (bitola mínima 0.5mm²)                    ║
+║                                                                                   ║
+║   4. Mantenha o ESP32 e o ZMPT101B em uma caixa isolante (proteção)              ║
+║                                                                                   ║
+║   5. O ESP32 alimentado por USB está em contato com o computador                 ║
+║      → O isolamento do ZMPT101B protege o computador                             ║
+║                                                                                   ║
+║   6. SEMPRE desenergize o circuito antes de fazer qualquer alteração             ║
+║                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════╝
 
 ---
 ```
@@ -1058,7 +1158,7 @@ cpp
 const char* WIFI_SSID     = "POO-G13";
 const char* WIFI_PASSWORD = "12345678";
 const char* SERVER_IP     = "192.168.0.100";
-const int   SERVER_PORT   = 8765;
+const int   SERVER_PORT   = 8080;
 
 ---
 ```
