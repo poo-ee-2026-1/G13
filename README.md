@@ -1261,167 +1261,167 @@ Unicidade                                              Documento+Endereço únic
 
 📅 Semana 1: 16/03
 Infraestrutura e Camada de Persistência
-Atividade	Descrição
-Configuração do ambiente	Instalação do JDK 11+, Maven, IDE (IntelliJ/Eclipse) e Git
-Criação da estrutura de diretórios	Pacotes: model, dao, ui, service, util
-Configuração do pom.xml	Adicionar dependências: Jackson Databind e Jackson JSR310
-Implementação da DatabaseConnection	Métodos: carregarLista(), salvarLista(), gerarNovoId(), inicializarArquivos()
-Criação das entidades base	Cliente.java, Equipamento.java, Usuario.java
-Implementação dos DAOs iniciais	ClienteDAO.java, EquipamentoDAO.java, UsuarioDAO.java
-Teste de persistência	Verificar criação do diretório data/ e arquivos JSON
+Atividade                            Descrição                                                                           
+Configuração do ambiente             Instalação do JDK 11+, Maven, IDE (IntelliJ/Eclipse) e Git                          
+Criação da estrutura de diretórios   Pacotes: model, dao, ui, service, util                                              
+Configuração do pom.xml              Adicionar dependências: Jackson Databind e Jackson JSR310                           
+Implementação da DatabaseConnection  Métodos: carregarLista(), salvarLista(), gerarNovoId(), inicializarArquivos()       
+Criação das entidades base           Cliente.java, Equipamento.java, Usuario.java                                        
+Implementação dos DAOs iniciais      ClienteDAO.java, EquipamentoDAO.java, UsuarioDAO.java                               
+Teste de persistência                Verificar criação do diretório data/ e arquivos JSON                               
 
 📅 Semana 2: 23/03
 Cadastros Base e Utilitários
-Atividade									Descrição
-Implementação do ValidadorDocumento.java	Validação de CPF (11 dígitos) e CNPJ (14 dígitos)
-Criação do Departamento.java e DepartamentoDAO.java	CRUD de departamentos
-Criação do Funcao.java e FuncaoDAO.java	CRUD de funções com vínculo a departamento
-Desenvolvimento da TelaLogin.java	Autenticação de usuários
-Desenvolvimento da TelaPrincipal.java	JMenuBar com estrutura de menus, JTabbedPane
-Desenvolvimento da TelaDepartamentos.java	CRUD completo de departamentos
-Desenvolvimento da TelaFuncoes.java	CRUD completo de funções
-Inicialização de dados padrão	Departamento e Funções padrão no Main.java
-Criação do usuário admin padrão	Login: admin / Senha: admin123
+Atividade                                            Descrição                                               
+Implementação do ValidadorDocumento.java             Validação de CPF (11 dígitos) e CNPJ (14 dígitos)       
+Criação do Departamento.java e DepartamentoDAO.java  CRUD de departamentos                                   
+Criação do Funcao.java e FuncaoDAO.java              CRUD de funções com vínculo a departamento              
+Desenvolvimento da TelaLogin.java                    Autenticação de usuários                                
+Desenvolvimento da TelaPrincipal.java                JMenuBar com estrutura de menus, JTabbedPane            
+Desenvolvimento da TelaDepartamentos.java            CRUD completo de departamentos                          
+Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções                                
+Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
+Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
 📅 Semana 3: 30/03
 Módulo de Clientes e Equipamentos
-Atividade	Descrição
-Desenvolvimento da TelaClientes.java	Formulário com campos para PF/PJ
-Validação de unicidade	Garantir documento+endereço únicos
-Associação de equipamento ao cliente	JComboBox para selecionar equipamento
-Campo prioridade de atendimento	BAIXA, MEDIA, ALTA
-Campo IP do cliente	Validação de formato de IP
-Desenvolvimento da TelaEquipamentos.java	CRUD de equipamentos
-Validação de tensão nominal	Faixa permitida: 1V a 1500V
-Integração Cliente ↔ Equipamento	Exibir equipamento vinculado na tabela
-Testes de cadastro	Inserir, atualizar, excluir, buscar
+Atividade                                            Descrição                                               
+Implementação do ValidadorDocumento.java             Validação de CPF (11 dígitos) e CNPJ (14 dígitos)       
+Criação do Departamento.java e DepartamentoDAO.java  CRUD de departamentos                                   
+Criação do Funcao.java e FuncaoDAO.java              CRUD de funções com vínculo a departamento              
+Desenvolvimento da TelaLogin.java                    Autenticação de usuários                                
+Desenvolvimento da TelaPrincipal.java                JMenuBar com estrutura de menus, JTabbedPane            
+Desenvolvimento da TelaDepartamentos.java            CRUD completo de departamentos                          
+Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções                                
+Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
+Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
 📅 Semana 4: 06/04
 Módulo de Monitoramento e Comunicação ESP32
-Atividade	Descrição
-Implementação do MonitoramentoService.java	Classe DadosMonitoramento (inner class), timers por cliente
-Implementação do MedicaoTensao.java e MedicaoTensaoDAO.java	Persistência das medições
-Desenvolvimento do HttpApiServer.java	Servidor HTTP porta 8081, endpoint /api/voltage, /api/health, /api/clientes
-Desenvolvimento do WebSocketServer.java	Servidor porta 8080, mapeamento IP → Cliente
-Integração dos servidores com MonitoramentoService	Método receberMedicao(idCliente, tensao)
-Desenvolvimento da TelaMonitoramento.java	Tabela com colunas: Cliente, Equipamento, Estado, Tensão, Situação, Disponibilidade
-Timer de atualização automática	Atualização a cada 1 segundo
-Renderizadores customizados	Cores para estado da rede, tensão, disponibilidade
-Modo pausa/retomada	Controle via botão e tecla F8
+Atividade                                            Descrição                                               
+Implementação do ValidadorDocumento.java             Validação de CPF (11 dígitos) e CNPJ (14 dígitos)       
+Criação do Departamento.java e DepartamentoDAO.java  CRUD de departamentos                                   
+Criação do Funcao.java e FuncaoDAO.java              CRUD de funções com vínculo a departamento              
+Desenvolvimento da TelaLogin.java                    Autenticação de usuários                                
+Desenvolvimento da TelaPrincipal.java                JMenuBar com estrutura de menus, JTabbedPane            
+Desenvolvimento da TelaDepartamentos.java            CRUD completo de departamentos                          
+Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções                                
+Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
+Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
 📅 Semana 5: 13/04
 Módulo de Atendimento e Ordens de Serviço
-Atividade	Descrição
-Implementação do Atendimento.java e AtendimentoDAO.java	Persistência de atendimentos
-Desenvolvimento da TelaAtendimento.java	CRUD de atendimentos, tipos: INFORMAÇÃO, SUGESTÃO, SOLICITAÇÃO, RECLAMAÇÃO
-Implementação do OrdemServico.java e OrdemServicoDAO.java	Modelo e persistência de OS
-Implementação do OrdemServicoService.java	Filas por nível (1º, 2º, 3º), métodos de escalonamento
-Interface OSListener	Notificações: onOSCriada(), onOSEscalada(), onOSFechada()
-Interface OrdemServicoCallback	Callback para abertura automática de OS
-Desenvolvimento da TelaOrdensServico.java	Listagem de OS, filtros por status, nível, tipo, cliente
-Ações da OS	Abrir (REPARO), Escalar Nível, Fechar
-Integração Atendimento → OS	Conversão de SOLICITAÇÃO em OS INFORMAÇÃO
-Regras de abertura automática	Tensão 0 por >5s, 3 alertas consecutivos, 3 críticos consecutivos, timeout 10s
+aAtividade                                            Descrição                                               
+Implementação do ValidadorDocumento.java             Validação de CPF (11 dígitos) e CNPJ (14 dígitos)       
+Criação do Departamento.java e DepartamentoDAO.java  CRUD de departamentos                                   
+Criação do Funcao.java e FuncaoDAO.java              CRUD de funções com vínculo a departamento              
+Desenvolvimento da TelaLogin.java                    Autenticação de usuários                                
+Desenvolvimento da TelaPrincipal.java                JMenuBar com estrutura de menus, JTabbedPane            
+Desenvolvimento da TelaDepartamentos.java            CRUD completo de departamentos                          
+Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções                                
+Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
+Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
 📅 Semana 6: 20/04
 Módulo de Estoque
-Atividade	Descrição
-Implementação do ProdutoEstoque.java e ProdutoEstoqueDAO.java	CRUD de produtos, campos: código, nome, categoria, quantidade, quantidade mínima, preços
-Implementação do MovimentacaoEstoque.java e MovimentacaoEstoqueDAO.java	Histórico de movimentações (entrada/saída/reserva)
-Desenvolvimento da TelaEstoque.java	CRUD completo de produtos
-Destaque visual para estoque baixo	Coluna quantidade com ícone ⚠️
-Desenvolvimento da TelaEstoqueBaixo.java	Filtro automático de produtos com quantidade ≤ mínima
-Implementação do listener estático	addEstoqueBaixoListener(), notificarListenersEstoqueBaixo()
-Atualização automática	Quando TelaEstoque altera produtos, TelaEstoqueBaixo atualiza
-Botão "Solicitar Compra"	Geração de pedido com quantidade recomendada
-Desenvolvimento da TelaMovimentacoesEstoque.java	Histórico com filtros (tipo, motivo, período)
-Resumo financeiro	Total entradas, total saídas, saldo do período
+Atividade                                                                Descrição                                                                                      
+Implementação do ProdutoEstoque.java e ProdutoEstoqueDAO.java            CRUD de produtos, campos: código, nome, categoria, quantidade, quantidade mínima, preços       
+Implementação do MovimentacaoEstoque.java e MovimentacaoEstoqueDAO.java  Histórico de movimentações (entrada/saída/reserva)                                             
+Desenvolvimento da TelaEstoque.java                                      CRUD completo de produtos                                                                      
+Destaque visual para estoque baixo                                       Coluna quantidade com ícone ⚠️                                                                 
+Desenvolvimento da TelaEstoqueBaixo.java                                 Filtro automático de produtos com quantidade ≤ mínima                                          
+Implementação do listener estático                                       addEstoqueBaixoListener(), notificarListenersEstoqueBaixo()                                    
+Atualização automática                                                   Quando TelaEstoque altera produtos, TelaEstoqueBaixo atualiza                                  
+Botão "Solicitar Compra"                                                 Geração de pedido com quantidade recomendada                                                   
+Desenvolvimento da TelaMovimentacoesEstoque.java                         Histórico com filtros (tipo, motivo, período)                                                  
+Resumo financeiro                                                        Total entradas, total saídas, saldo do período
 
 📅 Semana 7: 27/04
 Módulo de Orçamentos e Instalações
-Atividade	Descrição
-Desenvolvimento da TelaOrcamento.java	Criação de orçamentos, seleção de produtos do estoque
-Persistência de orçamentos	Arquivo orcamentos.json
-Aprovação de orçamento	Reserva de produtos no estoque
-Implementação do ReservaProduto.java e ReservaProdutoDAO.java	Gerenciamento de reservas
-Rejeição de orçamento	Cancelamento de reserva
-Desenvolvimento da TelaOrdemInstalacao.java	Listagem de OS de instalação
-Conversão de orçamento aprovado em OS de instalação	Baixa no estoque (consumo da reserva)
-Implementação do InstalacaoProduto.java e InstalacaoProdutoDAO.java	Produtos vinculados à OS de instalação
-Conclusão de instalação	Baixa final no estoque
-Geração de mensalidades de monitoramento	Ao concluir instalação, gerar parcelas
-Geração de conta a receber da instalação	Valor total no financeiro
+Atividade                                                            Descrição                                                   
+Desenvolvimento da TelaOrcamento.java                                Criação de orçamentos, seleção de produtos do estoque       
+Persistência de orçamentos                                           Arquivo orcamentos.json                                     
+Aprovação de orçamento                                               Reserva de produtos no estoque                              
+Implementação do ReservaProduto.java e ReservaProdutoDAO.java        Gerenciamento de reservas                                   
+Rejeição de orçamento                                                Cancelamento de reserva                                     
+Desenvolvimento da TelaOrdemInstalacao.java                          Listagem de OS de instalação                                
+Conversão de orçamento aprovado em OS de instalação                  Baixa no estoque (consumo da reserva)                       
+Implementação do InstalacaoProduto.java e InstalacaoProdutoDAO.java  Produtos vinculados à OS de instalação                      
+Conclusão de instalação                                              Baixa final no estoque                                      
+Geração de mensalidades de monitoramento                             Ao concluir instalação, gerar parcelas                      
+Geração de conta a receber da instalação                             Valor total no financeiro                                 
 
 📅 Semana 8: 04/05
 Módulo Financeiro e RH
-Atividade	Descrição
-Implementação do TransacaoFinanceira.java e TransacaoFinanceiraDAO.java	CRUD de transações, cálculo de saldo
-Implementação do ParcelaMonitoramento.java e ParcelaMonitoramentoDAO.java	Parcelas de mensalidades
-Desenvolvimento da TelaFinanceiro.java	Abas: Transações, Contas à Pagar, Contas à Receber, Resumo Financeiro, Nova Transação
-Filtros por tipo, status, período	Listagem dinâmica
-Geração de parcelas	Integração com conclusão de instalação
-Desenvolvimento da TelaRH.java	CRUD de funcionários (campos: nome, CPF, matrícula, função, departamento)
-Campo nível de atendimento	1º Nível, 2º Nível, 3º Nível (controle de visibilidade de OS)
-Método podeVisualizarNivel()	Implementado em Usuario.java
-Integração com TelaOrdensServico e TelaTI	Filtro de OS por nível do usuário
-
+Atividade                                                                  Descrição                                                                                   
+Implementação do TransacaoFinanceira.java e TransacaoFinanceiraDAO.java    CRUD de transações, cálculo de saldo                                                        
+Implementação do ParcelaMonitoramento.java e ParcelaMonitoramentoDAO.java  Parcelas de mensalidades                                                                    
+Desenvolvimento da TelaFinanceiro.java                                     Abas: Transações, Contas à Pagar, Contas à Receber, Resumo Financeiro, Nova Transação       
+Filtros por tipo, status, período                                          Listagem dinâmica                                                                           
+Geração de parcelas                                                        Integração com conclusão de instalação                                                      
+Desenvolvimento da TelaRH.java                                             CRUD de funcionários (campos: nome, CPF, matrícula, função, departamento)                   
+Campo nível de atendimento                                                 1º Nível, 2º Nível, 3º Nível (controle de visibilidade de OS)                               
+Método podeVisualizarNivel()                                               Implementado em Usuario.java                                                                
+Integração com TelaOrdensServico e TelaTI                                  Filtro de OS por nível do usuário                                                           
+                                                                                                                                                 
 📅 Semana 9: 11/05
 Módulo de Relatórios e Finalização do TI
-Atividade	Descrição
-Desenvolvimento da TelaRelatorios.java	Múltiplas abas: Ordens de Serviço, Medição de Tensão, Disponibilidade, Estatísticas Gerais, Listas
-Aba Ordens de Serviço	Listagem com filtros (status, nível, tipo, cliente)
-Aba Medição de Tensão	Seleção de cliente, período, gráfico (se implementado), resumo (média, min, max, alertas, críticos)
-Aba Disponibilidade	Tabela com disponibilidade por cliente, média geral
-Aba Estatísticas Gerais	Métricas: total OS, abertas/fechadas, tempo médio resolução, falhas por categoria
-Aba Listas	Tabelas: Usuários, Clientes, Equipamentos, Departamentos, Funções
-Botão Exportar CSV	Exportar dados da aba atual
-Desenvolvimento da TelaTI.java	Gestão de OS para TI (REPARO)
-Filtros por status, nível, tipo, cliente	Similar à TelaOrdensServico
-Escalonamento (1º → 2º → 3º Nível)	Baseado no nível do usuário
-Finalização da TelaVisualizarOS.java	Detalhamento de OS individual
+Atividade                                 Descrição                                                                                                 
+Desenvolvimento da TelaRelatorios.java    Múltiplas abas: Ordens de Serviço, Medição de Tensão, Disponibilidade, Estatísticas Gerais, Listas        
+Aba Ordens de Serviço                     Listagem com filtros (status, nível, tipo, cliente)                                                       
+Aba Medição de Tensão                     Seleção de cliente, período, gráfico (se implementado), resumo (média, min, max, alertas, críticos)       
+Aba Disponibilidade                       Tabela com disponibilidade por cliente, média geral                                                       
+Aba Estatísticas Gerais                   Métricas: total OS, abertas/fechadas, tempo médio resolução, falhas por categoria                         
+Aba Listas                                Tabelas: Usuários, Clientes, Equipamentos, Departamentos, Funções                                         
+Botão Exportar CSV                        Exportar dados da aba atual                                                                               
+Desenvolvimento da TelaTI.java            Gestão de OS para TI (REPARO)                                                                             
+Filtros por status, nível, tipo, cliente  Similar à TelaOrdensServico                                                                               
+Escalonamento (1º → 2º → 3º Nível)        Baseado no nível do usuário                                                                               
+Finalização da TelaVisualizarOS.java      Detalhamento de OS individual                                                                            
 
 📅 Semana 10: 18/05
 Integração e Testes do ESP32
-Atividade	Descrição
-Código Arduino para ESP32	Leitura do sensor ZMPT101B, calibração de sensibilidade
-Configuração WiFi	IP estático, conexão à rede
-Envio de medições	POST para http://servidor:8080/api/voltage a cada 500ms
-Formato JSON	{"voltage": 220.50, "timestamp": xxx, "deviceId": "ESP32_01"}
-Teste de integração ESP32 ↔ Servidor	Verificar recebimento e processamento
-Mapeamento IP → Cliente	Configurar IP do ESP32 no cadastro do cliente
-Teste de abertura automática de OS	Simular tensão zero, alertas, críticos
-Teste de timeout	Desconectar ESP32 e verificar OS após 10s
-Teste de disponibilidade	Verificar cálculo correto
-Modo de simulação do servidor	Comandos via console (simular <id> <tensao>, listar, sair)
+Atividade                             Descrição                                                                           
+Código Arduino para ESP32             Leitura do sensor ZMPT101B, calibração de sensibilidade                             
+Configuração WiFi                     IP estático, conexão à rede                                                         
+Envio de medições                     POST para http://servidor:8080/api/voltage a cada 500ms                             
+Formato JSON                          \{"voltage": 220.50, "timestamp": xxx, "deviceId": "ESP32\_01"\}                    
+Teste de integração ESP32 ↔ Servidor  Verificar recebimento e processamento                                               
+Mapeamento IP → Cliente               Configurar IP do ESP32 no cadastro do cliente                                       
+Teste de abertura automática de OS    Simular tensão zero, alertas, críticos                                              
+Teste de timeout                      Desconectar ESP32 e verificar OS após 10s                                           
+Teste de disponibilidade              Verificar cálculo correto                                                           
+Modo de simulação do servidor         Comandos via console (simular, listar, sair)   
+                                                                                                                          
 
 📅 Semana 11: 25/05
 Testes Integrados e Correções
-Atividade	Descrição
-Teste de fluxo completo: Cadastro Cliente	Criar cliente com equipamento e IP
-Teste de monitoramento	ESP32 enviando medições, TelaMonitoramento atualizando
-Teste de abertura automática de OS	Verificar regras de negócio
-Teste de atendimento	Registrar atendimento, converter para OS
-Teste de orçamento	Criar orçamento com produtos, aprovar, reservar estoque
-Teste de instalação	Converter orçamento em OS de instalação, baixar estoque
-Teste financeiro	Gerar mensalidades, contas a receber
-Teste de relatórios	Verificar todas as abas e exportação CSV
-Teste de permissões	Usuários 1º/2º/3º Nível visualizam OS corretas
-Correção de bugs	Identificados durante os testes
-Otimização de performance	Queries de JSON, atualizações de tela
+Atividade                                  Descrição                                                     
+Teste de fluxo completo: Cadastro Cliente  Criar cliente com equipamento e IP                            
+Teste de monitoramento                     ESP32 enviando medições, TelaMonitoramento atualizando        
+Teste de abertura automática de OS         Verificar regras de negócio                                   
+Teste de atendimento                       Registrar atendimento, converter para OS                      
+Teste de orçamento                         Criar orçamento com produtos, aprovar, reservar estoque       
+Teste de instalação                        Converter orçamento em OS de instalação, baixar estoque       
+Teste financeiro                           Gerar mensalidades, contas a receber                          
+Teste de relatórios                        Verificar todas as abas e exportação CSV                      
+Teste de permissões                        Usuários 1º/2º/3º Nível visualizam OS corretas                
+Correção de bugs                           Identificados durante os testes                               
+Otimização de performance                  Queries de JSON, atualizações de tela                        
 
 📅 Semana 12: 01/06
 Documentação e Entrega Final
-Atividade	Descrição
-Documentação do código	JavaDoc para classes e métodos principais
-Atualização do README.md	Instruções de instalação, configuração e execução
-Documentação da API	Endpoints: /api/voltage, /api/health, /api/clientes
-Documentação do ESP32	Esquema de ligação, código Arduino, calibração
-Manual do usuário	Telas, funcionalidades, atalhos de teclado (F2, F4, F5, F8)
-Vídeo de demonstração	Principais funcionalidades do sistema (opcional)
-Empacotamento da aplicação	Gerar arquivo JAR executável
-Preparação dos arquivos de dados	Incluir dados de exemplo no diretório data/
-Revisão final	Verificar checklist de requisitos
-Entrega do projeto	Código-fonte, documentação, JAR, e dados de exemplo
+Atividade                         Descrição                                                         
+Documentação do código            JavaDoc para classes e métodos principais                         
+Atualização do README.md          Instruções de instalação, configuração e execução                 
+Documentação da API               Endpoints: /api/voltage, /api/health, /api/clientes               
+Documentação do ESP32             Esquema de ligação, código Arduino, calibração                    
+Manual do usuário                 Telas, funcionalidades, atalhos de teclado (F2, F4, F5, F8)       
+Vídeo de demonstração             Principais funcionalidades do sistema (opcional)                  
+Empacotamento da aplicação        Gerar arquivo JAR executável                                      
+Preparação dos arquivos de dados  Incluir dados de exemplo no diretório data/                       
+Revisão final                     Verificar checklist de requisitos                                 
+Entrega do projeto                Código-fonte, documentação, JAR, e dados de exemplo               
 
 ---
 ````
@@ -1431,19 +1431,19 @@ Entrega do projeto	Código-fonte, documentação, JAR, e dados de exemplo
 ```
 ---
 
-Data	Marco	Principais Entregáveis
-16/03	Infraestrutura	DatabaseConnection, Entidades Base, DAOs iniciais
-23/03	Cadastros Base	TelaLogin, TelaPrincipal, Departamentos, Funções
-30/03	Clientes e Equipamentos	TelaClientes, TelaEquipamentos, validação CPF/CNPJ
-06/04	Monitoramento	MonitoramentoService, HttpApiServer, TelaMonitoramento
-13/04	Atendimento e OS	TelaAtendimento, OrdemServicoService, TelaOrdensServico
-20/04	Estoque	TelaEstoque, TelaEstoqueBaixo, Movimentações
-27/04	Orçamentos e Instalações	TelaOrcamento, TelaOrdemInstalacao, Reservas
-04/05	Financeiro e RH	TelaFinanceiro, TelaRH, Parcelas Monitoramento
-11/05	Relatórios e TI	TelaRelatorios, TelaTI, Exportação CSV
-18/05	Integração ESP32	Código Arduino, testes de comunicação
-25/05	Testes Integrados	Validação de todos os fluxos, correções
-01/06	Entrega Final	Documentação, JAR, manual, vídeo
+Data   Marco                     Principais Entregáveis                                      
+16/03  Infraestrutura            DatabaseConnection, Entidades Base, DAOs iniciais           
+23/03  Cadastros Base            TelaLogin, TelaPrincipal, Departamentos, Funções            
+30/03  Clientes e Equipamentos   TelaClientes, TelaEquipamentos, validação CPF/CNPJ          
+06/04  Monitoramento             MonitoramentoService, HttpApiServer, TelaMonitoramento      
+13/04  Atendimento e OS          TelaAtendimento, OrdemServicoService, TelaOrdensServico     
+20/04  Estoque                   TelaEstoque, TelaEstoqueBaixo, Movimentações                
+27/04  Orçamentos e Instalações  TelaOrcamento, TelaOrdemInstalacao, Reservas                
+04/05  Financeiro e RH           TelaFinanceiro, TelaRH, Parcelas Monitoramento              
+11/05  Relatórios e TI           TelaRelatorios, TelaTI, Exportação CSV                      
+18/05  Integração ESP32          Código Arduino, testes de comunicação                       
+25/05  Testes Integrados         Validação de todos os fluxos, correções                     
+01/06  Entrega Final             Documentação, JAR, manual, vídeo                           
 
 ---
 ```
