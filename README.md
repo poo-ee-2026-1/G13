@@ -119,86 +119,86 @@ O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medi
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐    │
-│  │                         MonitoramentoService                                 │   │
-│  │  • Gerencia timers de verificação por cliente                                 │   │
-│  │  • Processa medições recebidas do ESP32                                       │   │
-│  │  • Controla estado PAUSADO/ATIVO                                              │   │
-│  │  • Calcula disponibilidade e estatísticas                                     │   │
-│  │  • Dispara callback para abertura automática de OS                            │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  │                         MonitoramentoService                                │    │
+│  │  • Gerencia timers de verificação por cliente                               │    │
+│  │  • Processa medições recebidas do ESP32                                     │    │
+│  │  • Controla estado PAUSADO/ATIVO                                            │    │
+│  │  • Calcula disponibilidade e estatísticas                                   │    │
+│  │  • Dispara callback para abertura automática de OS                          │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         OrdemServicoService                                   │   │
-│  │  • Gerencia filas de OS por nível (1º, 2º, 3º)                                │   │
-│  │  • Implementa OrdemServicoCallback para OS automáticas                        │   │
-│  │  • Escala OS entre níveis                                                     │   │
-│  │  • Notifica listeners sobre criação/escalonamento/fechamento de OS           │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         OrdemServicoService                                 │    │
+│  │  • Gerencia filas de OS por nível (1º, 2º, 3º)                              │    │
+│  │  • Implementa OrdemServicoCallback para OS automáticas                      │    │
+│  │  • Escala OS entre níveis                                                   │    │
+│  │  • Notifica listeners sobre criação/escalonamento/fechamento de OS          │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         WebSocketServer / HttpApiServer                       │   │
-│  │  • Servidor HTTP embutido (porta 8080/8081)                                   │   │
-│  │  • Endpoint POST /api/voltage para receber medições do ESP32                  │   │
-│  │  • Endpoint GET /api/health para health check                                 │   │
-│  │  • Mapeamento IP → Cliente para identificação automática                      │   │
-│  │  • Modo de simulação via console quando porta está em uso                     │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         WebSocketServer / HttpApiServer                     │    │
+│  │  • Servidor HTTP embutido (porta 8080/8081)                                 │    │
+│  │  • Endpoint POST /api/voltage para receber medições do ESP32                │    │
+│  │  • Endpoint GET /api/health para health check                               │    │
+│  │  • Mapeamento IP → Cliente para identificação automática                    │    │
+│  │  • Modo de simulação via console quando porta está em uso                   │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                               │
                                               │ Operações CRUD
                                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              CAMADA DE MODEL (MODEL)                                 │
+│                              CAMADA DE MODEL (MODEL)                                │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                              DAOs (Data Access Objects)                       │   │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │   │
-│  │  │ClienteDAO    │ │EquipamentoDAO│ │OrdemServico- │ │MedicaoTensao-│        │   │
-│  │  │              │ │              │ │DAO           │ │DAO           │        │   │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │   │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │   │
-│  │  │AtendimentoDAO│ │ProdutoEstoque│ │Transacao-    │ │UsuarioDAO    │        │   │
-│  │  │              │ │DAO           │ │FinanceiraDAO │ │              │        │   │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │   │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                          │   │
-│  │  │Departamento- │ │FuncaoDAO     │ │ParcelaMonito-│                          │   │
-│  │  │DAO           │ │              │ │ramentoDAO    │                          │   │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘                          │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              DAOs (Data Access Objects)                     │    │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │    │
+│  │  │ClienteDAO    │ │EquipamentoDAO│ │OrdemServico- │ │MedicaoTensao-│        │    │
+│  │  │              │ │              │ │DAO           │ │DAO           │        │    │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │    │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │    │
+│  │  │AtendimentoDAO│ │ProdutoEstoque│ │Transacao-    │ │UsuarioDAO    │        │    │
+│  │  │              │ │DAO           │ │FinanceiraDAO │ │              │        │    │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │    │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                         │    │
+│  │  │Departamento- │ │FuncaoDAO     │ │ParcelaMonito-│                         │    │
+│  │  │DAO           │ │              │ │ramentoDAO    │                         │    │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘                         │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                           ENTITIES (POJOs)                                    │   │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           ENTITIES (POJOs)                                   │   │
 │  │  Cliente, Equipamento, OrdemServico, Atendimento, MedicaoTensao, Usuario,    │   │
 │  │  Departamento, Funcao, ProdutoEstoque, MovimentacaoEstoque,                  │   │
 │  │  TransacaoFinanceira, ParcelaMonitoramento, InstalacaoProduto, ReservaProduto│   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  └──────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                               │
                                               │ Leitura/Escrita JSON
                                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              CAMADA DE PERSISTÊNCIA (DATA)                           │
+│                              CAMADA DE PERSISTÊNCIA (DATA)                          │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         DatabaseConnection (Util)                            │   │
-│  │  • Gerenciamento de arquivos JSON via Jackson ObjectMapper                    │   │
-│  │  • Geração automática de IDs sequenciais                                      │   │
-│  │  • Criação automática do diretório data/ e arquivos vazios                    │   │
-│  │  • Serialização/Deserialização com suporte a Java 8 Date/Time                 │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                         DatabaseConnection (Util)                           │    │
+│  │  • Gerenciamento de arquivos JSON via Jackson ObjectMapper                  │    │
+│  │  • Geração automática de IDs sequenciais                                    │    │
+│  │  • Criação automática do diretório data/ e arquivos vazios                  │    │
+│  │  • Serialização/Deserialização com suporte a Java 8 Date/Time               │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
-│  📁 Diretório: ./data/                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │  clientes.json │ equipamentos.json │ ordens_servico.json │ medicoes.json    │   │
-│  │  atendimentos.json │ usuarios.json │ departamentos.json │ funcoes.json      │   │
-│  │  produtos_estoque.json │ movimentacoes_estoque.json                           │   │
-│  │  transacoes_financeiras.json │ parcelas_monitoramento.json                   │   │
-│  │  instalacao_produtos.json │ reservas_produtos.json │ orcamentos.json         │   │
-│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│   Diretório: ./data/                                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │  clientes.json │ equipamentos.json │ ordens_servico.json │ medicoes.json    │    │
+│  │  atendimentos.json │ usuarios.json │ departamentos.json │ funcoes.json      │    │
+│  │  produtos_estoque.json │ movimentacoes_estoque.json                         │    │
+│  │  transacoes_financeiras.json │ parcelas_monitoramento.json                  │    │
+│  │  instalacao_produtos.json │ reservas_produtos.json │ orcamentos.json        │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -311,12 +311,12 @@ VOLTMONITOR/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                              SISTEMA VOLTMONITOR                                             │
+│                                              SISTEMA VOLTMONITOR                                            │
 │                                              Diagrama de Classes (UML)                                      │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                          CAMADA DE SERVIÇOS (SERVICE)                                        │
+│                                          CAMADA DE SERVIÇOS (SERVICE)                                       │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
@@ -324,34 +324,34 @@ VOLTMONITOR/
 ├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
 │ - clienteDAO: ClienteDAO                │       │ - ordemServicoDAO: OrdemServicoDAO      │
 │ - medicaoDAO: MedicaoTensaoDAO          │       │ - clienteDAO: ClienteDAO                │
-│ - dadosMonitoramento: Map<Int,Dados>    │       │ - filaOSPrimeiroNivel: Queue<OS>         │
-│ - timersCliente: Map<Int,Timer>         │       │ - filaOSSegundoNivel: Queue<OS>          │
-│ - pausado: boolean                      │       │ - filaOSTerceiroNivel: Queue<OS>         │
-│ - ordemServicoCallback: OrdemServico... │       │ - listeners: List<OSListener>            │
+│ - dadosMonitoramento: Map<Int,Dados>    │       │ - filaOSPrimeiroNivel: Queue<OS>        │
+│ - timersCliente: Map<Int,Timer>         │       │ - filaOSSegundoNivel: Queue<OS>         │
+│ - pausado: boolean                      │       │ - filaOSTerceiroNivel: Queue<OS>        │
+│ - ordemServicoCallback: OrdemServico... │       │ - listeners: List<OSListener>           │
 ├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ + iniciarMonitoramentoCliente(id)       │       │ + abrirOSAtendimento(...): OS            │
-│ + pararMonitoramentoCliente(id)         │       │ + abrirOSSuporteTecnico(...): OS         │
-│ + receberMedicao(id, tensao)            │       │ + abrirOSTI(...): OS                     │
-│ + setPausado(pausado)                   │       │ + abrirOSInstalacao(...): OS             │
-│ + calcularDisponibilidade(id): double   │       │ + abrirOrdemServicoManual(...): OS       │
-│ + getDadosMonitoramento(id): Dados      │       │ + escalarParaSegundoNivel(id): boolean   │
-│ + reiniciarMonitoramentoCliente(id)     │       │ + escalarParaTerceiroNivel(id): boolean  │
-│ + reinicializarTodosClientes()          │       │ + fecharOrdemServico(...): boolean       │
-└─────────────────────────────────────────┘       │ + listarTodasOS(): List<OS>              │
-                    ▲                             │ + getProximaOSPrimeiroNivel(): OS        │
-                    │ implements                  │ + addOSListener(listener)                │
+│ + iniciarMonitoramentoCliente(id)       │       │ + abrirOSAtendimento(...): OS           │
+│ + pararMonitoramentoCliente(id)         │       │ + abrirOSSuporteTecnico(...): OS        │
+│ + receberMedicao(id, tensao)            │       │ + abrirOSTI(...): OS                    │
+│ + setPausado(pausado)                   │       │ + abrirOSInstalacao(...): OS            │
+│ + calcularDisponibilidade(id): double   │       │ + abrirOrdemServicoManual(...): OS      │
+│ + getDadosMonitoramento(id): Dados      │       │ + escalarParaSegundoNivel(id): boolean  │
+│ + reiniciarMonitoramentoCliente(id)     │       │ + escalarParaTerceiroNivel(id): boolean │
+│ + reinicializarTodosClientes()          │       │ + fecharOrdemServico(...): boolean      │
+└─────────────────────────────────────────┘       │ + listarTodasOS(): List<OS>             │
+                    ▲                             │ + getProximaOSPrimeiroNivel(): OS       │
+                    │ implements                  │ + addOSListener(listener)               │
                     │                             └─────────────────────────────────────────┘
 ┌─────────────────────────────────────────┐                    ▲
 │ <<interface>>                           │                    │ implements
 │ OrdemServicoCallback                    │                    │
 ├─────────────────────────────────────────┤       ┌─────────────────────────────────────────┐
 │ + onAbrirOSAutomatica(idCliente, motivo)│       │ <<interface>>                           │
-└─────────────────────────────────────────┘       │ OSListener                               │
-                                                   ├─────────────────────────────────────────┤
-                                                   │ + onOSCriada(os)                        │
-                                                   │ + onOSEscalada(os)                      │
-                                                   │ + onOSFechada(os)                       │
-                                                   └─────────────────────────────────────────┘
+└─────────────────────────────────────────┘       │ OSListener                              │
+                                                  ├─────────────────────────────────────────┤
+                                                  │ + onOSCriada(os)                        │
+                                                  │ + onOSEscalada(os)                      │
+                                                  │ + onOSFechada(os)                       │
+                                                  └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
 │      WebSocketServer                    │       │      HttpApiServer                      │
@@ -368,60 +368,60 @@ VOLTMONITOR/
 └─────────────────────────────────────────┘       └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                             CAMADA DE MODELO (MODEL)                                         │
+│                                             CAMADA DE MODELO (MODEL)                                        │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│           Cliente                       │       │           Equipamento                   │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ - id: int                               │       │ - id: int                               │
-│ - tipo: String                          │       │ - marca: String                         │
-│ - documento: String                     │       │ - modelo: String                        │
-│ - nome: String                          │       │ - tensaoNominal: double                 │
-│ - sobrenome: String                     │       │ - idCliente: int                        │
-│ - razaoSocial: String                   │       ├─────────────────────────────────────────┤
-│ - nomeFantasia: String                  │       │ + Equipamento()                         │
-│ - logradouro: String                    │       │ + getMarca() / setMarca()               │
-│ - numero: String                        │       │ + getModelo() / setModelo()             │
+┌─────────────────────────────────────────┐       ┌──────────────────────────────────────────┐
+│           Cliente                       │       │           Equipamento                    │
+├─────────────────────────────────────────┤       ├──────────────────────────────────────────┤
+│ - id: int                               │       │ - id: int                                │
+│ - tipo: String                          │       │ - marca: String                          │
+│ - documento: String                     │       │ - modelo: String                         │
+│ - nome: String                          │       │ - tensaoNominal: double                  │
+│ - sobrenome: String                     │       │ - idCliente: int                         │
+│ - razaoSocial: String                   │       ├──────────────────────────────────────────┤
+│ - nomeFantasia: String                  │       │ + Equipamento()                          │
+│ - logradouro: String                    │       │ + getMarca() / setMarca()                │
+│ - numero: String                        │       │ + getModelo() / setModelo()              │
 │ - bairro: String                        │       │ + getTensaoNominal() / setTensaoNominal()│
-│ - cidade: String                        │       └─────────────────────────────────────────┘
+│ - cidade: String                        │       └──────────────────────────────────────────┘
 │ - estado: String                        │                   1
 │ - cep: String                           │                   │
 │ - telefoneDDD: String                   │                   │ has
 │ - telefoneNumero: String                │                   │
 │ - ipCliente: String                     │                   ▼
-│ - emMonitoramento: boolean              │       ┌─────────────────────────────────────────┐
+│ - emMonitoramento: boolean              │       ┌──────────────────────────────────────────┐
 │ - prioridadeAtendimento: String         │       │           OrdemServico                   │
-│ - dataCadastro: Date                    │       ├─────────────────────────────────────────┤
-│ - equipamento: Equipamento              │       │ - id: int                               │
-├─────────────────────────────────────────┤       │ - idCliente: int                        │
-│ + Cliente()                             │       │ - idEquipamento: int                    │
-│ + getNomeExibicao(): String             │       │ - tipoNivel: String                     │
-│ + getEnderecoCompleto(): String         │       │ - status: String                        │
-│ + getTelefoneCompleto(): String         │       │ - motivo: String                        │
-│ + mesmoDocumentoEEndereco(Cliente): bool│       │ - descricaoSolucao: String              │
-│ + getChaveDocumentoEndereco(): String   │       │ - falhaIdentificada: String             │
-└─────────────────────────────────────────┘       │ - dataAbertura: Date                    │
-                   1                              │ - dataFechamento: Date                  │
-                   │                              │ - idUsuarioAbertura: int                │
-                   │ has                          │ - idUsuarioFechamento: int              │
-                   │                              │ - tipoOs: String                        │
-                   ▼                              │ - tipoOrdem: String                     │
-┌─────────────────────────────────────────┐       │ - valorTotal: double                    │
-│           Atendimento                   │       │ - enderecoInstalacao: String            │
-├─────────────────────────────────────────┤       │ - dataAgendamento: Date                 │
-│ - id: int                               │       │ - prioridade: String                    │
+│ - dataCadastro: Date                    │       ├──────────────────────────────────────────┤
+│ - equipamento: Equipamento              │       │ - id: int                                │
+├─────────────────────────────────────────┤       │ - idCliente: int                         │
+│ + Cliente()                             │       │ - idEquipamento: int                     │
+│ + getNomeExibicao(): String             │       │ - tipoNivel: String                      │
+│ + getEnderecoCompleto(): String         │       │ - status: String                         │
+│ + getTelefoneCompleto(): String         │       │ - motivo: String                         │
+│ + mesmoDocumentoEEndereco(Cliente): bool│       │ - descricaoSolucao: String               │
+│ + getChaveDocumentoEndereco(): String   │       │ - falhaIdentificada: String              │
+└─────────────────────────────────────────┘       │ - dataAbertura: Date                     │
+                   1                              │ - dataFechamento: Date                   │
+                   │                              │ - idUsuarioAbertura: int                 │
+                   │ has                          │ - idUsuarioFechamento: int               │
+                   │                              │ - tipoOs: String                         │
+                   ▼                              │ - tipoOrdem: String                      │
+┌─────────────────────────────────────────┐       │ - valorTotal: double                     │
+│           Atendimento                   │       │ - enderecoInstalacao: String             │
+├─────────────────────────────────────────┤       │ - dataAgendamento: Date                  │
+│ - id: int                               │       │ - prioridade: String                     │
 │ - idCliente: int                        │       │ - produtosInstalacao: List<Instalacao...>│
-│ - tipo: String                          │       ├─────────────────────────────────────────┤
-│ - status: String                        │       │ + OrdemServico()                        │
-│ - assunto: String                       │       │ + isInstalacao(): boolean               │
-│ - descricao: String                     │       │ + isOrcamento(): boolean                │
-│ - prioridade: String                    │       │ + isInformacao(): boolean               │
-│ - dataAbertura: Date                    │       │ + isReparo(): boolean                   │
-│ - dataConclusao: Date                   │       │ + getPrioridadeExibicao(): String       │
-│ - idUsuarioAbertura: int                │       │ + adicionarProdutoInstalacao(Instalacao)│
-│ - idUsuarioAtendimento: int             │       │ + recalcularValorTotal()                │
-│ - idOrdemServicoVinculada: int          │       └─────────────────────────────────────────┘
+│ - tipo: String                          │       ├──────────────────────────────────────────┤
+│ - status: String                        │       │ + OrdemServico()                         │
+│ - assunto: String                       │       │ + isInstalacao(): boolean                │
+│ - descricao: String                     │       │ + isOrcamento(): boolean                 │
+│ - prioridade: String                    │       │ + isInformacao(): boolean                │
+│ - dataAbertura: Date                    │       │ + isReparo(): boolean                    │
+│ - dataConclusao: Date                   │       │ + getPrioridadeExibicao(): String        │ 
+│ - idUsuarioAbertura: int                │       │ + adicionarProdutoInstalacao(Instalacao) │
+│ - idUsuarioAtendimento: int             │       │ + recalcularValorTotal()                 │
+│ - idOrdemServicoVinculada: int          │       └──────────────────────────────────────────┘
 ├─────────────────────────────────────────┤                   1
 │ + Atendimento()                         │                   │
 └─────────────────────────────────────────┘                   │ contains
@@ -500,7 +500,7 @@ VOLTMONITOR/
                                                   └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│           Departamento                  │       │            Funcao                        │
+│           Departamento                  │       │            Funcao                       │
 ├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
 │ - id: int                               │       │ - id: int                               │
 │ - nome: String                          │       │ - nome: String                          │
@@ -513,30 +513,30 @@ VOLTMONITOR/
 └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                           CAMADA DE ACESSO A DADOS (DAO)                                     │
+│                                           CAMADA DE ACESSO A DADOS (DAO)                                    │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│           ClienteDAO                    │       │        OrdemServicoDAO                 │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+┌─────────────────────────────────────────┐       ┌──────────────────────────────────────────┐
+│           ClienteDAO                    │       │        OrdemServicoDAO                   │
+├─────────────────────────────────────────┤       ├──────────────────────────────────────────┤
 │ - FILE_NAME: String = "clientes.json"   │       │ - FILE_NAME: String = "ordens_servico..."│
-│ - clientes: List<Cliente>               │       │ - ordens: List<OrdemServico>            │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ + ClienteDAO()                          │       │ + OrdemServicoDAO()                     │
-│ + inserir(Cliente): boolean             │       │ + inserir(OS): boolean                  │
-│ + atualizar(Cliente): boolean           │       │ + atualizar(OS): boolean                │
-│ + excluir(id): boolean                  │       │ + excluir(id): boolean                  │
-│ + buscarPorId(id): Cliente              │       │ + buscarPorId(id): OS                   │
-│ + listarTodos(): List<Cliente>          │       │ + listarTodas(): List<OS>               │
-│ + buscarPorDocumento(doc): Cliente      │       │ + buscarPorCliente(id): List<OS>        │
-│ + listarPorMonitoramento(monitorando)   │       │ + buscarPorStatus(status): List<OS>     │
-│ + listarPorMonitoramento(boolean)       │       │ + listarOsInstalacao(): List<OS>        │
-│ + adicionarMonitoramento(id): boolean   │       │ + listarOsInformacao(): List<OS>        │
-│ + reiniciarMonitoramento(id): boolean   │       │ + listarOsReparo(): List<OS>            │
-└─────────────────────────────────────────┘       │ + listarOsOrcamento(): List<OS>         │
+│ - clientes: List<Cliente>               │       │ - ordens: List<OrdemServico>             │
+├─────────────────────────────────────────┤       ├──────────────────────────────────────────┤
+│ + ClienteDAO()                          │       │ + OrdemServicoDAO()                      │
+│ + inserir(Cliente): boolean             │       │ + inserir(OS): boolean                   │
+│ + atualizar(Cliente): boolean           │       │ + atualizar(OS): boolean                 │
+│ + excluir(id): boolean                  │       │ + excluir(id): boolean                   │
+│ + buscarPorId(id): Cliente              │       │ + buscarPorId(id): OS                    │
+│ + listarTodos(): List<Cliente>          │       │ + listarTodas(): List<OS>                │
+│ + buscarPorDocumento(doc): Cliente      │       │ + buscarPorCliente(id): List<OS>         │
+│ + listarPorMonitoramento(monitorando)   │       │ + buscarPorStatus(status): List<OS>      │
+│ + listarPorMonitoramento(boolean)       │       │ + listarOsInstalacao(): List<OS>         │
+│ + adicionarMonitoramento(id): boolean   │       │ + listarOsInformacao(): List<OS>         │
+│ + reiniciarMonitoramento(id): boolean   │       │ + listarOsReparo(): List<OS>             │
+└─────────────────────────────────────────┘       │ + listarOsOrcamento(): List<OS>          │
                                                   │ + clientePossuiOSAbertaPorTipo(...): bool│
-┌─────────────────────────────────────────┐       │ + fecharOrdemServico(...): boolean      │
-│        MonitoramentoService.Dados       │       └─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐       │ + fecharOrdemServico(...): boolean       │
+│        MonitoramentoService.Dados       │       └──────────────────────────────────────────┘
 │        Monitoramento (Inner Class)      │
 ├─────────────────────────────────────────┤       ┌─────────────────────────────────────────┐
 │ - idCliente: int                        │       │           UsuarioDAO                    │
@@ -553,53 +553,53 @@ VOLTMONITOR/
 │ - contadorAlertasConsecutivos: int      │       │ + listarPorNivel(nivel): List<Usuario>  │
 │ - contadorCriticosConsecutivos: int     │       └─────────────────────────────────────────┘
 │ - inicioEstadoInativo: Date             │
-│ - notificouInativo: boolean             │       ┌─────────────────────────────────────────┐
-│ - osAbertaInativo: boolean              │       │       ProdutoEstoqueDAO                 │
-│ - osAbertaAlerta: boolean               │       ├─────────────────────────────────────────┤
+│ - notificouInativo: boolean             │       ┌──────────────────────────────────────────┐
+│ - osAbertaInativo: boolean              │       │       ProdutoEstoqueDAO                  │
+│ - osAbertaAlerta: boolean               │       ├──────────────────────────────────────────┤
 │ - osAbertaCritico: boolean              │       │ - FILE_NAME: String = "produtos_estoq..."│
-├─────────────────────────────────────────┤       │ - produtos: List<ProdutoEstoque>        │
-│ + incrementarContadorMedicoes()         │       ├─────────────────────────────────────────┤
-│ + incrementarContadorAtivo()            │       │ + darBaixaEstoque(id,qtd,motivo,ref,usr)│
+├─────────────────────────────────────────┤       │ - produtos: List<ProdutoEstoque>         │
+│ + incrementarContadorMedicoes()         │       ├──────────────────────────────────────────┤
+│ + incrementarContadorAtivo()            │       │ + darBaixaEstoque(id,qtd,motivo,ref,usr) │
 │ + resetarContadorAlertasConsecutivos()  │       │ + adicionarEstoque(id,qtd,motivo,ref,usr)│
 └─────────────────────────────────────────┘       │ + listarEstoqueBaixo(): List<Produto>    │
-                                                  └─────────────────────────────────────────┘
+                                                  └──────────────────────────────────────────┘
 
-┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│      TransacaoFinanceiraDAO             │       │         AtendimentoDAO                  │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+┌─────────────────────────────────────────┐       ┌──────────────────────────────────────────┐
+│      TransacaoFinanceiraDAO             │       │         AtendimentoDAO                   │
+├─────────────────────────────────────────┤       ├──────────────────────────────────────────┤
 │ - FILE_NAME: String = "transacoes_fi..."│       │ - FILE_NAME: String = "atendimentos.json"│
-│ - transacoes: List<TransacaoFinanceira> │       │ - atendimentos: List<Atendimento>       │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+│ - transacoes: List<TransacaoFinanceira> │       │ - atendimentos: List<Atendimento>        │
+├─────────────────────────────────────────┤       ├──────────────────────────────────────────┤
 │ + calcularSaldo(): double               │       │ + listarPorCliente(id): List<Atendimento>│
-│ + listarContasPagar(): List<Transacao>  │       │ + listarPorTipo(tipo): List<Atendimento>│
-│ + listarContasReceber(): List<Transacao>│       │ + listarPorStatus(status): List<Atend.> │
-│ + getResumoPorNatureza(dataIni,dataFim) │       │ + concluirAtendimento(id,desc,usr): bool│
-└─────────────────────────────────────────┘       │ + listarPendentes(): List<Atendimento>  │
-                                                  └─────────────────────────────────────────┘
+│ + listarContasPagar(): List<Transacao>  │       │ + listarPorTipo(tipo): List<Atendimento> │ 
+│ + listarContasReceber(): List<Transacao>│       │ + listarPorStatus(status): List<Atend.>  │
+│ + getResumoPorNatureza(dataIni,dataFim) │       │ + concluirAtendimento(id,desc,usr): bool │
+└─────────────────────────────────────────┘       │ + listarPendentes(): List<Atendimento>   │
+                                                  └──────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                             CAMADA DE UTILITÁRIOS (UTIL)                                     │
+│                                             CAMADA DE UTILITÁRIOS (UTIL)                                    │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│      DatabaseConnection                 │       │        ValidadorDocumento               │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ - DATA_DIR: String = "data"             │       │ + validar(documento): boolean           │
-│ - objectMapper: ObjectMapper (static)   │       │ + validarCPF(cpf): boolean              │
-├─────────────────────────────────────────┤       │ + validarCNPJ(cnpj): boolean            │
-│ + carregarLista(fileName, class): List<T>│      │ + formatarCPF(cpf): String              │
-│ + salvarLista(fileName, list)           │       │ + formatarCNPJ(cnpj): String            │
-│ + carregarObjeto(fileName, class): T    │       │ + formatar(documento): String           │
-│ + salvarObjeto(fileName, objeto)        │       └─────────────────────────────────────────┘
-│ + gerarNovoId(lista): int               │
-│ + inicializarArquivos()                 │
-│ + recriarArquivo(fileName)              │
-│ + limparTodosDados()                    │
-│ + testConnection()                      │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
+│      DatabaseConnection                  │       │        ValidadorDocumento               │
+├──────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+│ - DATA_DIR: String = "data"              │       │ + validar(documento): boolean           │
+│ - objectMapper: ObjectMapper (static)    │       │ + validarCPF(cpf): boolean              │
+├───────────────────────────────────────── ┤       │ + validarCNPJ(cnpj): boolean            │
+│ + carregarLista(fileName, class): List<T>│       │ + formatarCPF(cpf): String              │
+│ + salvarLista(fileName, list)            │       │ + formatarCNPJ(cnpj): String            │
+│ + carregarObjeto(fileName, class): T     │       │ + formatar(documento): String           │
+│ + salvarObjeto(fileName, objeto)         │       └─────────────────────────────────────────┘
+│ + gerarNovoId(lista): int                │
+│ + inicializarArquivos()                  │
+│ + recriarArquivo(fileName)               │
+│ + limparTodosDados()                     │
+│ + testConnection()                       │
+└──────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                             CAMADA DE INTERFACE (UI) - PARCIAIS                               │
+│                                             CAMADA DE INTERFACE (UI) - PARCIAIS                             │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
@@ -618,20 +618,20 @@ VOLTMONITOR/
 │ - abrirOrdemServicoST()                 │       │ - iniciarMonitoramento()                │
 │ - abrirTI()                             │       └─────────────────────────────────────────┘
 │ - abrirOrcamento()                      │
-│ - abrirOrdemInstalacao()                │       ┌─────────────────────────────────────────┐
-│ - abrirClientes()                       │       │         TelaOrdensServico (JPanel)      │
-│ - abrirRH()                             │       ├─────────────────────────────────────────┤
-└─────────────────────────────────────────┘       │ - tabelaOrdens: JTable                  │
-                                                  │ - osService: OrdemServicoService        │
-                                                  │ - ordemServicoDAO: OrdemServicoDAO      │
-                                                  │ - usuarioLogado: Usuario                │
-                                                  ├─────────────────────────────────────────┤
-                                                  │ + carregarOrdens()                      │
-                                                  │ + abrirOSManual()                       │
-                                                  │ + escalarOrdem()                        │
-                                                  │ + fecharOrdem()                         │
+│ - abrirOrdemInstalacao()                │       ┌──────────────────────────────────────────┐
+│ - abrirClientes()                       │       │         TelaOrdensServico (JPanel)       │
+│ - abrirRH()                             │       ├──────────────────────────────────────────┤
+└─────────────────────────────────────────┘       │ - tabelaOrdens: JTable                   │
+                                                  │ - osService: OrdemServicoService         │
+                                                  │ - ordemServicoDAO: OrdemServicoDAO       │
+                                                  │ - usuarioLogado: Usuario                 │
+                                                  ├──────────────────────────────────────────┤
+                                                  │ + carregarOrdens()                       │
+                                                  │ + abrirOSManual()                        │ 
+                                                  │ + escalarOrdem()                         │
+                                                  │ + fecharOrdem()                          │
                                                   │ + onOSCriada(os)  (implements OSListener)│
-                                                  └─────────────────────────────────────────┘
+                                                  └──────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
 │         TelaClientes (JPanel)           │       │         TelaEstoque (JPanel)            │
@@ -647,19 +647,19 @@ VOLTMONITOR/
 │ - validarCampos(): boolean              │       │ + addEstoqueBaixoListener(listener)     │
 └─────────────────────────────────────────┘       └─────────────────────────────────────────┘
 
-┌─────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
-│      TelaEstoqueBaixo (JPanel)          │       │         TelaFinanceiro (JPanel)         │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ - produtoDAO: ProdutoEstoqueDAO         │       │ - transacaoDAO: TransacaoFinanceiraDAO  │
-│ - tabelaProdutos: JTable                │       │ - tabelaTransacoes: JTable              │
-│ - timerAtualizacao: Timer               │       │ - lblSaldo, lblTotalEntradas, etc.      │
-├─────────────────────────────────────────┤       ├─────────────────────────────────────────┤
-│ + atualizarLista()  (chamado pelo estoque)│     │ + carregarTransacoes()                  │
-│ - carregarProdutosEstoqueBaixo()        │       │ + registrarTransacao()                  │
-│ - solicitarCompra()                     │       │ + atualizarResumo()                     │
-│ - verDetalhesProduto()                  │       │ + criarPainelContasPagar()              │
-└─────────────────────────────────────────┘       │ + criarPainelContasReceber()            │
-                                                  └─────────────────────────────────────────┘
+┌───────────────────────────────────────────┐       ┌─────────────────────────────────────────┐
+│      TelaEstoqueBaixo (JPanel)            │       │         TelaFinanceiro (JPanel)         │
+├───────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+│ - produtoDAO: ProdutoEstoqueDAO           │       │ - transacaoDAO: TransacaoFinanceiraDAO  │
+│ - tabelaProdutos: JTable                  │       │ - tabelaTransacoes: JTable              │
+│ - timerAtualizacao: Timer                 │       │ - lblSaldo, lblTotalEntradas, etc.      │
+├───────────────────────────────────────────┤       ├─────────────────────────────────────────┤
+│ + atualizarLista()  (chamado pelo estoque)│       │ + carregarTransacoes()                  │
+│ - carregarProdutosEstoqueBaixo()          │       │ + registrarTransacao()                  │
+│ - solicitarCompra()                       │       │ + atualizarResumo()                     │
+│ - verDetalhesProduto()                    │       │ + criarPainelContasPagar()              │
+└───────────────────────────────────────────┘       │ + criarPainelContasReceber()            │
+                                                    └─────────────────────────────────────────┘
 ---
 ```
 ### Legenda de Relacionamentos
@@ -669,7 +669,7 @@ VOLTMONITOR/
 |---------|-------------|
 | Símbolo | Significado |
 |---------|-------------|
-| `─────►` | Associação / Dependência |
+| `─────►`  | Associação / Dependência |
 | `▷─────` | Herança / Implementação de interface |
 | `◆─────` | Composição (parte-todo forte) |
 | `◇─────` | Agregação (parte-todo fraca) |
@@ -704,27 +704,27 @@ VOLTMONITOR/
 ```
 ---
 ┌──────────┐    HTTP POST     ┌─────────────────┐    receberMedicao()    ┌─────────────────────┐
-│   ESP32   │ ──────────────► │  HttpApiServer   │ ────────────────────► │ MonitoramentoService │
-│  (Sensor) │  /api/voltage   │  (porta 8081)    │                        │                     │
+│   ESP32  │  ──────────────► │  HttpApiServer  │  ────────────────────► │ MonitoramentoService│
+│  (Sensor)│   /api/voltage   │  (porta 8081)   │                        │                     │
 └──────────┘                  └─────────────────┘                        └──────────┬──────────┘
                                                                                      │
                                     ┌────────────────────────────────────────────────┼────────────────────────────────────────────────┐
                                     │                                                │                                                │
                                     ▼                                                ▼                                                ▼
-                          ┌─────────────────┐                              ┌─────────────────┐                              ┌─────────────────┐
-                          │  WebSocketServer │                              │  MedicaoTensaoDAO│                              │OrdemServicoService│
-                          │   (porta 8080)   │                              │  (salvar JSON)   │                              │ (callback OS)   │
-                          └─────────────────┘                              └─────────────────┘                              └─────────────────┘
+                          ┌─────────────────┐                              ┌─────────────────┐                              ┌───────────────────┐
+                          │  WebSocketServer│                              │ MedicaoTensaoDAO│                              │OrdemServicoService│
+                          │   (porta 8080)  │                              │  (salvar JSON)  │                              │ (callback OS)     │
+                          └─────────────────┘                              └─────────────────┘                              └───────────────────┘
 
 ---
 ```
 
-### Fluxo de Monitoramento
+### Fluxo e Monitoramento
 
 ```
 ---
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Processo de Monitoramento Contínuo                              │
+│                              Processo de Monitoramento Contínuo                             │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 
 1. ESP32 envia medição a cada 500ms via HTTP POST para /api/voltage
@@ -770,7 +770,7 @@ ATIVO	  ✅ Sim (1s)	        ✅ Sim	                ✅ Sim
          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           TelaPrincipal                                     │
-│  JMenuBar com menus: Monitoração | Atendimento | Suporte Técnico | TI      │
+│  JMenuBar com menus: Monitoração | Atendimento | Suporte Técnico | TI       │
 │                       Vendas | Estoque | Cadastros | Financeiro | Relatórios│
 └─────────────────────────────────────────────────────────────────────────────┘
          │
@@ -1021,7 +1021,7 @@ Limitações:
 |----------|--------------|
 | Campo    | Valor        |
 |----------|--------------|
-| Login    | `admin`     |
+| Login    | `admin`      |
 | Senha    | `admin123`   |
 | Função   | Administrador|
 |----------|--------------|
@@ -1065,7 +1065,7 @@ Limitações:
 │   │  (5V)    │    (AMS1117-3.3)                                 │
 │   └──────────┘                                                  │
 │                                                                 │
-│   ⚠️ ATENÇÃO:                                                   │
+│   ATENÇÃO:                                                      │
 │   • O pino VIN do ESP32 aceita 5V direto (via USB ou pino VIN)  │
 │   • O pino 3.3V é SAÍDA do regulador interno (máx 300mA)        │
 │   • O ZMPT101B pode ser alimentado pelos 3.3V do ESP32          │
@@ -1082,8 +1082,8 @@ Limitações:
 ---
 
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                          ESP32 - Módulo ZMPT101B                                     │
-│                     (Medição de Tensão AC - 110V/220V)                               │
+│                          ESP32 - Módulo ZMPT101B                                    │
+│                     (Medição de Tensão AC - 110V/220V)                              │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
    ┌─────────────────┐                    ┌─────────────────┐
@@ -1096,7 +1096,7 @@ Limitações:
    │   GPIO34 (ADC)  │◄───────────────────┤OUT (Sinal)      │
    │                 │                    │                 │
    │         USB 5V  │════════════════════│─── (Alimentação │
-   │     (Alimentação)│                    │     separada)   │
+   │   (Alimentação) │                    │     separada)   │
    └─────────────────┘                    └────────┬────────┘
                                                     │
                                                     │ Entrada AC
@@ -1115,22 +1115,22 @@ Limitações:
 ---
 
 ╔═══════════════════════════════════════════════════════════════════════════════════╗
-║                              ⚠️  ATENÇÃO - SEGURANÇA  ⚠️                           ║
+║                              ⚠️  ATENÇÃO - SEGURANÇA  ⚠️                         ║
 ╠═══════════════════════════════════════════════════════════════════════════════════╣
 ║                                                                                   ║
-║   1. O ZMPT101B possui ISOLAMENTO GALVÂNICO (transformador)                      ║
-║      → A parte de alta tensão é isolada do ESP32                                 ║
+║   1. O ZMPT101B possui ISOLAMENTO GALVÂNICO (transformador)                       ║
+║      → A parte de alta tensão é isolada do ESP32                                  ║
 ║                                                                                   ║
-║   2. NUNCA toque nos terminais AC enquanto o circuito estiver energizado         ║
+║   2. NUNCA toque nos terminais AC enquanto o circuito estiver energizado          ║
 ║                                                                                   ║
-║   3. Utilize fiação adequada para 220V (bitola mínima 0.5mm²)                    ║
+║   3. Utilize fiação adequada para 220V (bitola mínima 0.5mm²)                     ║
 ║                                                                                   ║
-║   4. Mantenha o ESP32 e o ZMPT101B em uma caixa isolante (proteção)              ║
+║   4. Mantenha o ESP32 e o ZMPT101B em uma caixa isolante (proteção)               ║
 ║                                                                                   ║
-║   5. O ESP32 alimentado por USB está em contato com o computador                 ║
-║      → O isolamento do ZMPT101B protege o computador                             ║
+║   5. O ESP32 alimentado por USB está em contato com o computador                  ║
+║      → O isolamento do ZMPT101B protege o computador                              ║
 ║                                                                                   ║
-║   6. SEMPRE desenergize o circuito antes de fazer qualquer alteração             ║
+║   6. SEMPRE desenergize o circuito antes de fazer qualquer alteração              ║
 ║                                                                                   ║
 ╚═══════════════════════════════════════════════════════════════════════════════════╝
 
