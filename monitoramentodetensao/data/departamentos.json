@@ -1,0 +1,50 @@
+[ {
+  "id" : 1,
+  "nome" : "ADMINISTRAÇÃO",
+  "descricao" : "Departamento administrativo responsável pela gestão da empresa e do sistema",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 2,
+  "nome" : "MONITORAMENTO",
+  "descricao" : "Departamento responsável pelo monitoramento remoto",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 3,
+  "nome" : "SUPORTE TÉCNICO",
+  "descricao" : "Departamento responsável pelo suporte técnico presencial",
+  "responsavel" : "",
+  "telefone" : "",
+  "email" : ""
+}, {
+  "id" : 4,
+  "nome" : "ATENDIMENTO",
+  "descricao" : "Departamento responsável pelo atendimento ao cliente",
+  "responsavel" : "Teste",
+  "telefone" : "62991185365",
+  "email" : "teste@teste.com.br"
+}, {
+  "id" : 5,
+  "nome" : "VENDAS",
+  "descricao" : "Teste",
+  "responsavel" : "Teste",
+  "telefone" : "62991185365",
+  "email" : "teste@teste.com.br"
+}, {
+  "id" : 6,
+  "nome" : "FINANCEIRO",
+  "descricao" : "Teste",
+  "responsavel" : "Teste",
+  "telefone" : "62991185365",
+  "email" : "teste@teste.com.br"
+}, {
+  "id" : 7,
+  "nome" : "TI",
+  "descricao" : "Teste",
+  "responsavel" : "Teste",
+  "telefone" : "62991185365",
+  "email" : "teste@teste.com.br"
+} ]

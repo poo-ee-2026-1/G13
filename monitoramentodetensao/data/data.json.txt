@@ -1,0 +1,45 @@
+// clientes.json
+[]
+
+// equipamentos.json
+[]
+
+// usuarios.json
+[
+  {
+    "id": 1,
+    "nome": "Administrador",
+    "sobrenome": "Sistema",
+    "cpf": "00000000000",
+    "matricula": "ADMIN001",
+    "funcao": "Administrador",
+    "login": "admin",
+    "senha": "admin123",
+    "dataCadastro": null
+  }
+]
+
+// departamentos.json
+[
+  {
+    "id": 1,
+    "nome": "Administração",
+    "descricao": "Departamento administrativo responsável pela gestão do sistema"
+  },
+  {
+    "id": 2,
+    "nome": "Monitoramento",
+    "descricao": "Departamento responsável pelo monitoramento remoto"
+  },
+  {
+    "id": 3,
+    "nome": "Suporte Técnico",
+    "descricao": "Departamento responsável pelo suporte técnico presencial"
+  }
+]
+
+// medicoes.json
+[]
+
+// ordens_servico.json
+[]

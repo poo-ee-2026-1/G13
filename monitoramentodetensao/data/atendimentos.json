@@ -1,0 +1,27 @@
+[ {
+  "id" : 1,
+  "idCliente" : 1,
+  "tipo" : "INFORMACAO",
+  "status" : "CONCLUIDO",
+  "assunto" : ".",
+  "descricao" : ".\n\n--- CONCLUSÃO ---\n.",
+  "prioridade" : "BAIXA",
+  "dataAbertura" : "2026-05-12T02:40:26.764+00:00",
+  "dataConclusao" : "2026-05-12T02:41:24.915+00:00",
+  "idUsuarioAbertura" : 1,
+  "idUsuarioAtendimento" : 1,
+  "idOrdemServicoVinculada" : 0
+}, {
+  "id" : 2,
+  "idCliente" : 1,
+  "tipo" : "SOLICITACAO",
+  "status" : "CONCLUIDO",
+  "assunto" : ".",
+  "descricao" : ".\n\n--- CONVERSÃO PARA OS ---\nConvertido para OS #5 (INFORMAÇÃO) - Atendimento encaminhado ao 1º Nível.\nCliente possuía 1 OS aberta(s) antes desta conversão.\nNENHUMA OS foi fechada durante esta conversão.",
+  "prioridade" : "BAIXA",
+  "dataAbertura" : "2026-05-12T02:41:06.875+00:00",
+  "dataConclusao" : "2026-05-12T02:42:06.683+00:00",
+  "idUsuarioAbertura" : 1,
+  "idUsuarioAtendimento" : 1,
+  "idOrdemServicoVinculada" : 5
+} ]

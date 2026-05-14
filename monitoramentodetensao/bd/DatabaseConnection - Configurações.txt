@@ -1,0 +1,8 @@
+Configuração da conexão no Java
+
+Após criar o banco de dados, atualize o arquivo DatabaseConnection.java se necessário:
+
+
+private static final String URL = "jdbc:mysql://localhost:3306/monitoramento_tensao?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=utf8";
+private static final String USER = "root";
+private static final String PASSWORD = ""; // Coloque sua senha aqui se tiver

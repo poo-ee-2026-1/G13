@@ -1,0 +1,14 @@
+[ {
+  "id" : 1,
+  "nome" : "Elberty",
+  "sobrenome" : "Borges de Oliveira",
+  "cpf" : "01715709101",
+  "matricula" : "202503341",
+  "funcao" : "Administrador",
+  "departamento" : "ADMINISTRAÇÃO",
+  "login" : "admin",
+  "senha" : "admin1",
+  "dataCadastro" : null,
+  "nivelAtendimento" : "3º Nível",
+  "nomeCompleto" : "Elberty Borges de Oliveira"
+} ]

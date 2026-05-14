@@ -1,0 +1,19 @@
+[ {
+  "id" : 1,
+  "marca" : "Equipamento de Teste - 1",
+  "modelo" : "Modelo de Teste - 1",
+  "tensaoNominal" : 220.0,
+  "idCliente" : 1
+}, {
+  "id" : 2,
+  "marca" : "Equipamento de Teste - 2",
+  "modelo" : "Modelo de Teste - 2",
+  "tensaoNominal" : 220.0,
+  "idCliente" : 2
+}, {
+  "id" : 3,
+  "marca" : "Equipamento de Teste - 3",
+  "modelo" : "Modelo de Teste - 3",
+  "tensaoNominal" : 220.0,
+  "idCliente" : 3
+} ]

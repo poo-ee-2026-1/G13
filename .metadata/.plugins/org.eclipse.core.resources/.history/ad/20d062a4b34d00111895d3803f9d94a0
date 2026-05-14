@@ -1,0 +1,517 @@
+// TelaEstoqueBaixo.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.ProdutoEstoque;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.dao.ProdutoEstoqueDAO;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
+import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.ArrayList;
+
+public class TelaEstoqueBaixo extends JPanel {
+    private ProdutoEstoqueDAO produtoDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaProdutos;
+    private DefaultTableModel tableModel;
+    private JButton btnAtualizar, btnSolicitarCompra;
+    private javax.swing.Timer timerAtualizacao;
+    private JLabel lblStatusAtualizacao;
+    
+    // Cores para diferentes níveis de alerta
+    private static final Color COR_CRITICO = new Color(255, 200, 200);
+    private static final Color COR_ALERTA = new Color(255, 240, 200);
+    private static final Color COR_ZERO = new Color(255, 180, 180);
+    
+    public TelaEstoqueBaixo(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.produtoDAO = new ProdutoEstoqueDAO();
+        
+        initComponents();
+        carregarProdutosEstoqueBaixo();
+        
+        // Registrar esta tela para receber notificações da TelaEstoque
+        TelaEstoque.registrarTelaEstoqueBaixo(this);
+        
+        // Iniciar timer para atualização automática a cada 5 segundos
+        iniciarTimerAtualizacao();
+    }
+    
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        TelaEstoque.removerTelaEstoqueBaixo(this);
+        if (timerAtualizacao != null) {
+            timerAtualizacao.stop();
+        }
+    }
+    
+    private void iniciarTimerAtualizacao() {
+        timerAtualizacao = new javax.swing.Timer(5000, e -> {
+            SwingUtilities.invokeLater(() -> {
+                if (isVisible()) {
+                    carregarProdutosEstoqueBaixo();
+                }
+            });
+        });
+        timerAtualizacao.start();
+    }
+    
+    /**
+     * Método público para atualizar a lista (chamado pela TelaEstoque)
+     */
+    public void atualizarLista() {
+        SwingUtilities.invokeLater(() -> {
+            carregarProdutosEstoqueBaixo();
+            if (lblStatusAtualizacao != null) {
+                lblStatusAtualizacao.setText("✓ Atualizado: " + new SimpleDateFormat("HH:mm:ss").format(new Date()));
+                // Limpar a mensagem após 3 segundos
+                new Timer(3000, evt -> lblStatusAtualizacao.setText("")).start();
+            }
+        });
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Painel de informações com status
+        JPanel painelTopo = new JPanel(new BorderLayout());
+        
+        JPanel painelInfo = new JPanel();
+        painelInfo.setBackground(new Color(255, 200, 200));
+        painelInfo.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JLabel lblInfo = new JLabel("⚠️ ATENÇÃO: Produtos com quantidade abaixo do estoque mínimo!");
+        lblInfo.setFont(new Font("Arial", Font.BOLD, 14));
+        lblInfo.setForeground(Color.RED);
+        painelInfo.add(lblInfo);
+        
+        JPanel painelStatus = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        painelStatus.setBackground(new Color(240, 248, 255));
+        lblStatusAtualizacao = new JLabel("Atualização automática a cada 5 segundos");
+        lblStatusAtualizacao.setFont(new Font("Arial", Font.ITALIC, 10));
+        lblStatusAtualizacao.setForeground(new Color(70, 130, 180));
+        painelStatus.add(lblStatusAtualizacao);
+        
+        painelTopo.add(painelInfo, BorderLayout.CENTER);
+        painelTopo.add(painelStatus, BorderLayout.SOUTH);
+        
+        // Tabela
+        String[] colunas = {"ID", "Código", "Nome", "Categoria", "Quantidade Atual", "Quantidade Mínima", "Déficit", "Localização", "Status"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaProdutos = new JTable(tableModel);
+        tabelaProdutos.setRowHeight(30);
+        tabelaProdutos.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        // Configurar renderizadores
+        tabelaProdutos.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tabelaProdutos.getColumnModel().getColumn(1).setPreferredWidth(100);
+        tabelaProdutos.getColumnModel().getColumn(2).setPreferredWidth(200);
+        tabelaProdutos.getColumnModel().getColumn(3).setPreferredWidth(100);
+        tabelaProdutos.getColumnModel().getColumn(4).setPreferredWidth(100);
+        tabelaProdutos.getColumnModel().getColumn(5).setPreferredWidth(100);
+        tabelaProdutos.getColumnModel().getColumn(6).setPreferredWidth(80);
+        tabelaProdutos.getColumnModel().getColumn(7).setPreferredWidth(150);
+        tabelaProdutos.getColumnModel().getColumn(8).setPreferredWidth(100);
+        
+        // Renderizador personalizado para colorir linhas
+        tabelaProdutos.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                    boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                setHorizontalAlignment(SwingConstants.CENTER);
+                
+                if (!isSelected) {
+                    int quantidade = 0;
+                    try {
+                        Object qtdObj = tableModel.getValueAt(row, 4);
+                        if (qtdObj instanceof Integer) {
+                            quantidade = (Integer) qtdObj;
+                        } else if (qtdObj instanceof String) {
+                            quantidade = Integer.parseInt((String) qtdObj);
+                        }
+                    } catch (Exception e) {
+                        // Ignorar
+                    }
+                    
+                    int quantidadeMinima = 0;
+                    try {
+                        Object minObj = tableModel.getValueAt(row, 5);
+                        if (minObj instanceof Integer) {
+                            quantidadeMinima = (Integer) minObj;
+                        } else if (minObj instanceof String) {
+                            quantidadeMinima = Integer.parseInt((String) minObj);
+                        }
+                    } catch (Exception e) {
+                        // Ignorar
+                    }
+                    
+                    if (quantidade == 0) {
+                        c.setBackground(COR_ZERO);
+                    } else if (quantidade * 100 / quantidadeMinima <= 10) {
+                        c.setBackground(COR_CRITICO);
+                    } else {
+                        c.setBackground(COR_ALERTA);
+                    }
+                } else {
+                    c.setBackground(table.getSelectionBackground());
+                }
+                
+                return c;
+            }
+        });
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaProdutos);
+        
+        // Botões
+        JPanel painelBotoes = new JPanel(new FlowLayout());
+        
+        btnAtualizar = new JButton("Atualizar Agora");
+        btnSolicitarCompra = new JButton("Solicitar Compra");
+        JButton btnVerProduto = new JButton("Ver Detalhes");
+        
+        btnAtualizar.setBackground(new Color(70, 130, 180));
+        btnAtualizar.setForeground(Color.WHITE);
+        btnAtualizar.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnSolicitarCompra.setBackground(new Color(60, 120, 60));
+        btnSolicitarCompra.setForeground(Color.WHITE);
+        btnSolicitarCompra.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnVerProduto.setBackground(new Color(100, 100, 200));
+        btnVerProduto.setForeground(Color.WHITE);
+        btnVerProduto.setFont(new Font("Arial", Font.BOLD, 12));
+        
+        btnAtualizar.addActionListener(e -> {
+            carregarProdutosEstoqueBaixo();
+            lblStatusAtualizacao.setText("✓ Atualizado manualmente: " + new SimpleDateFormat("HH:mm:ss").format(new Date()));
+            new Timer(3000, evt -> lblStatusAtualizacao.setText("Atualização automática a cada 5 segundos")).start();
+        });
+        
+        btnSolicitarCompra.addActionListener(e -> solicitarCompra());
+        btnVerProduto.addActionListener(e -> verDetalhesProduto());
+        
+        painelBotoes.add(btnAtualizar);
+        painelBotoes.add(btnSolicitarCompra);
+        painelBotoes.add(btnVerProduto);
+        
+        // Painel de estatísticas
+        JPanel painelStats = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelStats.setBorder(BorderFactory.createTitledBorder("Resumo"));
+        painelStats.setBackground(new Color(240, 248, 255));
+        
+        JLabel lblTotalProdutos = new JLabel();
+        JLabel lblTotalZero = new JLabel();
+        JLabel lblTotalCritico = new JLabel();
+        
+        painelStats.add(lblTotalProdutos);
+        painelStats.add(Box.createHorizontalStrut(20));
+        painelStats.add(lblTotalZero);
+        painelStats.add(Box.createHorizontalStrut(20));
+        painelStats.add(lblTotalCritico);
+        
+        // Atualizar estatísticas
+        Timer statsTimer = new Timer(1000, e -> {
+            int total = tableModel.getRowCount();
+            int zero = 0;
+            int critico = 0;
+            
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                try {
+                    int qtd = (int) tableModel.getValueAt(i, 4);
+                    int min = (int) tableModel.getValueAt(i, 5);
+                    if (qtd == 0) {
+                        zero++;
+                    } else if (qtd * 100 / min <= 10) {
+                        critico++;
+                    }
+                } catch (Exception ex) {
+                    // Ignorar
+                }
+            }
+            
+            lblTotalProdutos.setText("📦 Total com estoque baixo: " + total);
+            lblTotalZero.setText("⚠️ Estoque ZERO: " + zero);
+            lblTotalCritico.setText("🔥 Crítico (<10%): " + critico);
+            
+            if (zero > 0) {
+                lblTotalZero.setForeground(Color.RED);
+            } else {
+                lblTotalZero.setForeground(new Color(0, 100, 0));
+            }
+            
+            if (critico > 0) {
+                lblTotalCritico.setForeground(new Color(255, 100, 0));
+            } else {
+                lblTotalCritico.setForeground(new Color(0, 100, 0));
+            }
+        });
+        statsTimer.start();
+        
+        // Toolbar
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        
+        JButton btnRefresh = new JButton("Atualizar Tudo");
+        btnRefresh.addActionListener(e -> carregarProdutosEstoqueBaixo());
+        
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        // Organizar layout
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelTopo, BorderLayout.CENTER);
+        
+        JPanel painelSul = new JPanel(new BorderLayout());
+        painelSul.add(painelBotoes, BorderLayout.NORTH);
+        painelSul.add(painelStats, BorderLayout.SOUTH);
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(scrollTabela, BorderLayout.CENTER);
+        add(painelSul, BorderLayout.SOUTH);
+    }
+    
+    private void carregarProdutosEstoqueBaixo() {
+        // Limpar tabela
+        tableModel.setRowCount(0);
+        
+        // Buscar todos os produtos
+        List<ProdutoEstoque> todosProdutos = produtoDAO.listarTodos();
+        
+        // Filtrar apenas produtos com estoque baixo
+        List<ProdutoEstoque> produtosBaixo = new ArrayList<>();
+        for (ProdutoEstoque p : todosProdutos) {
+            if (p.isAtivo() && p.getQuantidade() <= p.getQuantidadeMinima()) {
+                produtosBaixo.add(p);
+            }
+        }
+        
+        System.out.println("[ESTOQUE BAIXO] Produtos encontrados com estoque baixo: " + produtosBaixo.size());
+        
+        if (produtosBaixo.isEmpty()) {
+            Object[] row = {0, "---", "Nenhum produto com estoque baixo", "---", 0, 0, 0, "---", "NORMAL"};
+            tableModel.addRow(row);
+            return;
+        }
+        
+        // Ordenar por criticidade (primeiro os com estoque zero, depois os críticos)
+        produtosBaixo.sort((a, b) -> {
+            if (a.getQuantidade() == 0 && b.getQuantidade() != 0) return -1;
+            if (a.getQuantidade() != 0 && b.getQuantidade() == 0) return 1;
+            
+            int percentA = a.getQuantidade() * 100 / a.getQuantidadeMinima();
+            int percentB = b.getQuantidade() * 100 / b.getQuantidadeMinima();
+            return Integer.compare(percentA, percentB);
+        });
+        
+        for (ProdutoEstoque p : produtosBaixo) {
+            int deficit = p.getQuantidadeMinima() - p.getQuantidade();
+            if (deficit < 0) deficit = 0;
+            
+            int percentual = (p.getQuantidade() * 100) / p.getQuantidadeMinima();
+            String status;
+            
+            if (p.getQuantidade() == 0) {
+                status = "⚠️ ZERO - URGENTE!";
+            } else if (percentual <= 10) {
+                status = "🔥 CRÍTICO (" + percentual + "%)";
+            } else {
+                status = "⚠️ BAIXO (" + percentual + "%)";
+            }
+            
+            Object[] row = {
+                p.getId(),
+                p.getCodigo(),
+                p.getNome(),
+                p.getCategoria(),
+                p.getQuantidade(),
+                p.getQuantidadeMinima(),
+                deficit,
+                p.getLocalizacao() != null ? p.getLocalizacao() : "---",
+                status
+            };
+            tableModel.addRow(row);
+        }
+        
+        // Atualizar tooltip com timestamp
+        String horaAtual = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(new Date());
+        tabelaProdutos.getTableHeader().setToolTipText("Última atualização: " + horaAtual);
+    }
+    
+    private void solicitarCompra() {
+        int row = tabelaProdutos.getSelectedRow();
+        if (row < 0 || tableModel.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um produto para solicitar compra!");
+            return;
+        }
+        
+        // Verificar se é a linha de "nenhum produto"
+        if (tableModel.getValueAt(row, 0) instanceof Integer && (Integer) tableModel.getValueAt(row, 0) == 0) {
+            JOptionPane.showMessageDialog(this, "Nenhum produto selecionado!");
+            return;
+        }
+        
+        int idProduto = (int) tableModel.getValueAt(row, 0);
+        String nomeProduto = (String) tableModel.getValueAt(row, 2);
+        int quantidadeAtual = (int) tableModel.getValueAt(row, 4);
+        int quantidadeMinima = (int) tableModel.getValueAt(row, 5);
+        int deficit = (int) tableModel.getValueAt(row, 6);
+        
+        ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+        if (produto == null) {
+            JOptionPane.showMessageDialog(this, "Produto não encontrado!");
+            return;
+        }
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        panel.add(new JLabel("Produto:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(nomeProduto), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(new JLabel("Quantidade Atual:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(String.valueOf(quantidadeAtual) + " " + produto.getUnidadeMedida()), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Quantidade Mínima:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(String.valueOf(quantidadeMinima) + " " + produto.getUnidadeMedida()), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(new JLabel("Déficit:"), gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel(String.valueOf(deficit) + " " + produto.getUnidadeMedida()), gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4;
+        panel.add(new JLabel("Quantidade Recomendada:"), gbc);
+        int recomendado = Math.max(deficit, produto.getQuantidadeMinima());
+        JSpinner spQuantidade = new JSpinner(new SpinnerNumberModel(recomendado, 1, 1000, 1));
+        gbc.gridx = 1;
+        panel.add(spQuantidade, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 5;
+        panel.add(new JLabel("Prioridade:"), gbc);
+        JComboBox<String> comboPrioridade = new JComboBox<>(new String[]{"NORMAL", "URGENTE", "CRÍTICA"});
+        if (quantidadeAtual == 0) {
+            comboPrioridade.setSelectedItem("CRÍTICA");
+        } else if (quantidadeAtual * 100 / quantidadeMinima <= 10) {
+            comboPrioridade.setSelectedItem("URGENTE");
+        }
+        gbc.gridx = 1;
+        panel.add(comboPrioridade, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 6;
+        panel.add(new JLabel("Justificativa:"), gbc);
+        JTextArea txtJustificativa = new JTextArea(3, 30);
+        txtJustificativa.setLineWrap(true);
+        String justificativaDefault = "Reposição de estoque - quantidade abaixo do mínimo (" + 
+            quantidadeAtual + "/" + quantidadeMinima + ")";
+        txtJustificativa.setText(justificativaDefault);
+        JScrollPane scrollJust = new JScrollPane(txtJustificativa);
+        gbc.gridx = 1;
+        panel.add(scrollJust, gbc);
+        
+        int result = JOptionPane.showConfirmDialog(this, panel, 
+            "Solicitar Compra - " + nomeProduto, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        
+        if (result == JOptionPane.OK_OPTION) {
+            int quantidade = (int) spQuantidade.getValue();
+            String prioridade = (String) comboPrioridade.getSelectedItem();
+            String justificativa = txtJustificativa.getText().trim();
+            if (justificativa.isEmpty()) {
+                justificativa = justificativaDefault;
+            }
+            
+            double valorTotal = quantidade * produto.getPrecoCusto();
+            
+            String mensagem = "✅ Solicitação de compra registrada!\n\n" +
+                "Produto: " + nomeProduto + "\n" +
+                "Quantidade: " + quantidade + " " + produto.getUnidadeMedida() + "\n" +
+                "Prioridade: " + prioridade + "\n" +
+                "Preço unitário: R$ " + String.format("%.2f", produto.getPrecoCusto()) + "\n" +
+                "Valor total estimado: R$ " + String.format("%.2f", valorTotal) + "\n" +
+                "Justificativa: " + justificativa + "\n\n" +
+                "A solicitação foi registrada. O departamento de compras será notificado.";
+            
+            JOptionPane.showMessageDialog(this, mensagem, "Solicitação Enviada", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+    
+    private void verDetalhesProduto() {
+        int row = tabelaProdutos.getSelectedRow();
+        if (row < 0 || tableModel.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "Selecione um produto para ver detalhes!");
+            return;
+        }
+        
+        if (tableModel.getValueAt(row, 0) instanceof Integer && (Integer) tableModel.getValueAt(row, 0) == 0) {
+            JOptionPane.showMessageDialog(this, "Nenhum produto selecionado!");
+            return;
+        }
+        
+        int idProduto = (int) tableModel.getValueAt(row, 0);
+        ProdutoEstoque produto = produtoDAO.buscarPorId(idProduto);
+        
+        if (produto == null) {
+            JOptionPane.showMessageDialog(this, "Produto não encontrado!");
+            return;
+        }
+        
+        JTextArea txtDetalhes = new JTextArea(15, 50);
+        txtDetalhes.setEditable(false);
+        txtDetalhes.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        
+        int deficit = produto.getQuantidadeMinima() - produto.getQuantidade();
+        int percentual = (produto.getQuantidade() * 100) / produto.getQuantidadeMinima();
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== DETALHES DO PRODUTO ===\n\n");
+        sb.append("ID: ").append(produto.getId()).append("\n");
+        sb.append("Código: ").append(produto.getCodigo()).append("\n");
+        sb.append("Nome: ").append(produto.getNome()).append("\n");
+        sb.append("Categoria: ").append(produto.getCategoria()).append("\n");
+        sb.append("Fabricante: ").append(produto.getFabricante() != null ? produto.getFabricante() : "---").append("\n");
+        sb.append("Modelo: ").append(produto.getModelo() != null ? produto.getModelo() : "---").append("\n\n");
+        
+        sb.append("=== ESTOQUE ===\n");
+        sb.append("Quantidade Atual: ").append(produto.getQuantidade()).append(" ").append(produto.getUnidadeMedida()).append("\n");
+        sb.append("Quantidade Mínima: ").append(produto.getQuantidadeMinima()).append(" ").append(produto.getUnidadeMedida()).append("\n");
+        sb.append("Déficit: ").append(deficit).append(" ").append(produto.getUnidadeMedida()).append("\n");
+        sb.append("Percentual do mínimo: ").append(String.format("%.1f", (double) percentual)).append("%\n");
+        sb.append("Localização: ").append(produto.getLocalizacao() != null ? produto.getLocalizacao() : "---").append("\n\n");
+        
+        sb.append("=== PREÇOS ===\n");
+        sb.append("Preço de Custo: R$ ").append(String.format("%.2f", produto.getPrecoCusto())).append("\n");
+        sb.append("Preço de Venda: R$ ").append(String.format("%.2f", produto.getPrecoVenda())).append("\n");
+        sb.append("Margem: ").append(String.format("%.1f", (produto.getPrecoVenda() - produto.getPrecoCusto()) * 100 / produto.getPrecoCusto())).append("%\n\n");
+        
+        sb.append("=== DESCRIÇÃO ===\n");
+        sb.append(produto.getDescricao() != null && !produto.getDescricao().isEmpty() ? produto.getDescricao() : "---").append("\n");
+        
+        txtDetalhes.setText(sb.toString());
+        
+        JOptionPane.showMessageDialog(this, new JScrollPane(txtDetalhes), 
+            "Detalhes do Produto - " + produto.getNome(), JOptionPane.INFORMATION_MESSAGE);
+    }
+}

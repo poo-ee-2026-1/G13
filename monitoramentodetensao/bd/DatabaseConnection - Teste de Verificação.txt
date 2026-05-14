@@ -1,0 +1,8 @@
+-- Verificar tabelas
+SHOW TABLES;
+
+-- Verificar usuário admin
+SELECT * FROM usuarios WHERE login = 'admin';
+
+-- Testar conexão
+SELECT 'Conexão OK' as status, NOW() as data_hora;

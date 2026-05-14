@@ -1,0 +1,289 @@
+// TelaVisualizarOS.java
+package com.monitoramento.ui;
+
+import com.monitoramento.model.OrdemServico;
+import com.monitoramento.model.Usuario;
+import com.monitoramento.service.OrdemServicoService;
+import com.monitoramento.dao.ClienteDAO;
+import com.monitoramento.Main;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.List;
+
+public class TelaVisualizarOS extends JPanel {
+    private OrdemServicoService osService;
+    private ClienteDAO clienteDAO;
+    private Usuario usuarioLogado;
+    
+    private JTable tabelaOS;
+    private DefaultTableModel tableModel;
+    private JComboBox<String> comboTipoOS;
+    private JComboBox<String> comboStatus;
+    private JButton btnFiltrar, btnAtualizar, btnDetalhes;
+    
+    public TelaVisualizarOS(Usuario usuario) {
+        this.usuarioLogado = usuario;
+        this.osService = Main.getOrdemServicoService();
+        this.clienteDAO = new ClienteDAO();
+        
+        initComponents();
+        carregarOS();
+    }
+    
+    private void initComponents() {
+        setLayout(new BorderLayout());
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JPanel painelFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        painelFiltros.setBorder(BorderFactory.createTitledBorder("Filtrar Ordens de Serviço"));
+        
+        painelFiltros.add(new JLabel("Tipo de OS:"));
+        comboTipoOS = new JComboBox<>(new String[]{"TODAS", "INFORMAÇÃO", "REPARO", "INSTALAÇÃO", "ORÇAMENTO"});
+        
+        painelFiltros.add(new JLabel("Status:"));
+        comboStatus = new JComboBox<>(new String[]{"TODOS", "ABERTA", "EM_ATENDIMENTO", "FECHADA"});
+        
+        btnFiltrar = new JButton("Filtrar");
+        btnAtualizar = new JButton("Atualizar");
+        btnDetalhes = new JButton("Ver Detalhes");
+        
+        btnFiltrar.addActionListener(e -> filtrarOS());
+        btnAtualizar.addActionListener(e -> carregarOS());
+        btnDetalhes.addActionListener(e -> verDetalhes());
+        
+        painelFiltros.add(comboTipoOS);
+        painelFiltros.add(comboStatus);
+        painelFiltros.add(btnFiltrar);
+        painelFiltros.add(btnAtualizar);
+        painelFiltros.add(btnDetalhes);
+        
+        String[] colunas = {"ID", "Cliente", "Tipo", "Nível", "Status", "Motivo", "Data Abertura", "Departamento Origem", "Valor"};
+        tableModel = new DefaultTableModel(colunas, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        
+        tabelaOS = new JTable(tableModel);
+        tabelaOS.setRowHeight(25);
+        tabelaOS.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                btnDetalhes.setEnabled(tabelaOS.getSelectedRow() >= 0);
+            }
+        });
+        btnDetalhes.setEnabled(false);
+        
+        JScrollPane scrollTabela = new JScrollPane(tabelaOS);
+        
+        JToolBar toolBar = new JToolBar();
+        toolBar.setFloatable(false);
+        JButton btnRefresh = new JButton("Atualizar Tudo");
+        btnRefresh.addActionListener(e -> carregarOS());
+        toolBar.add(btnRefresh);
+        toolBar.add(Box.createHorizontalGlue());
+        
+        JPanel painelNorte = new JPanel(new BorderLayout());
+        painelNorte.add(toolBar, BorderLayout.NORTH);
+        painelNorte.add(painelFiltros, BorderLayout.CENTER);
+        
+        JPanel painelStats = criarPainelEstatisticas();
+        
+        add(painelNorte, BorderLayout.NORTH);
+        add(scrollTabela, BorderLayout.CENTER);
+        add(painelStats, BorderLayout.SOUTH);
+    }
+    
+    private JPanel criarPainelEstatisticas() {
+        JPanel panel = new JPanel(new GridLayout(1, 5, 10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("Estatísticas Gerais"));
+        
+        JLabel lblTotal = new JLabel("Total: 0");
+        JLabel lblInfo = new JLabel("Informação: 0");
+        JLabel lblReparo = new JLabel("Reparo: 0");
+        JLabel lblInstalacao = new JLabel("Instalação: 0");
+        JLabel lblOrcamento = new JLabel("Orçamento: 0");
+        
+        lblTotal.setFont(new Font("Arial", Font.BOLD, 12));
+        lblInfo.setFont(new Font("Arial", Font.PLAIN, 11));
+        lblReparo.setFont(new Font("Arial", Font.PLAIN, 11));
+        lblInstalacao.setFont(new Font("Arial", Font.PLAIN, 11));
+        lblOrcamento.setFont(new Font("Arial", Font.PLAIN, 11));
+        
+        panel.add(lblTotal);
+        panel.add(lblInfo);
+        panel.add(lblReparo);
+        panel.add(lblInstalacao);
+        panel.add(lblOrcamento);
+        
+        new Timer(10000, e -> {
+            if (osService != null) {
+                lblTotal.setText("Total: " + osService.listarTodasOS().size());
+                lblInfo.setText("Informação: " + osService.listarOsInformacao().size());
+                lblReparo.setText("Reparo: " + osService.listarOsReparo().size());
+                lblInstalacao.setText("Instalação: " + osService.listarOsInstalacao().size());
+                lblOrcamento.setText("Orçamento: " + osService.listarOsOrcamento().size());
+            }
+        }).start();
+        
+        return panel;
+    }
+    
+    private void carregarOS() {
+        if (osService == null) return;
+        
+        tableModel.setRowCount(0);
+        List<OrdemServico> ordens = osService.listarTodasOS();
+        adicionarOrdensTabela(ordens);
+    }
+    
+    private void filtrarOS() {
+        if (osService == null) return;
+        
+        String tipo = (String) comboTipoOS.getSelectedItem();
+        String status = (String) comboStatus.getSelectedItem();
+        
+        List<OrdemServico> ordens;
+        
+        switch (tipo) {
+            case "INFORMAÇÃO":
+                ordens = osService.listarOsInformacao();
+                break;
+            case "REPARO":
+                ordens = osService.listarOsReparo();
+                break;
+            case "INSTALAÇÃO":
+                ordens = osService.listarOsInstalacao();
+                break;
+            case "ORÇAMENTO":
+                ordens = osService.listarOsOrcamento();
+                break;
+            default:
+                ordens = osService.listarTodasOS();
+                break;
+        }
+        
+        if (!"TODOS".equals(status)) {
+            ordens = ordens.stream()
+                .filter(os -> os.getStatus() != null && os.getStatus().equals(status))
+                .toList();
+        }
+        
+        adicionarOrdensTabela(ordens);
+    }
+    
+    private void adicionarOrdensTabela(List<OrdemServico> ordens) {
+        tableModel.setRowCount(0);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        
+        for (OrdemServico os : ordens) {
+            var cliente = clienteDAO.buscarPorId(os.getIdCliente());
+            String nomeCliente = cliente != null ? cliente.getNomeExibicao() : "N/A";
+            
+            String tipoOs = os.getTipoOs() != null ? os.getTipoOs() : 
+                           (os.isInstalacao() ? "INSTALAÇÃO" : 
+                           (os.isOrcamento() ? "ORÇAMENTO" : "SERVIÇO"));
+            
+            String statusExibicao = "";
+            switch (os.getStatus()) {
+                case "ABERTA": statusExibicao = "ABERTA"; break;
+                case "EM_ATENDIMENTO": statusExibicao = "EM ATENDIMENTO"; break;
+                case "FECHADA": statusExibicao = "FECHADA"; break;
+                default: statusExibicao = os.getStatus();
+            }
+            
+            // CORREÇÃO: Verificar se motivo é null antes de usar substring
+            String motivo = os.getMotivo();
+            String motivoExibicao = "";
+            if (motivo != null && !motivo.isEmpty()) {
+                motivoExibicao = motivo.length() > 40 ? motivo.substring(0, 40) + "..." : motivo;
+            } else {
+                motivoExibicao = "---";
+            }
+            
+            Object[] row = {
+                os.getId(),
+                nomeCliente,
+                tipoOs,
+                os.getTipoNivel(),
+                statusExibicao,
+                motivoExibicao,
+                os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "",
+                os.getDepartamentoOrigem() != null ? os.getDepartamentoOrigem() : "---",
+                os.getValorTotal() > 0 ? String.format("R$ %.2f", os.getValorTotal()) : "---"
+            };
+            tableModel.addRow(row);
+        }
+        
+        if (tableModel.getRowCount() == 0) {
+            Object[] row = {"---", "Nenhum registro encontrado", "---", "---", "---", "---", "---", "---", "---"};
+            tableModel.addRow(row);
+        }
+    }
+    
+    private void verDetalhes() {
+        int row = tabelaOS.getSelectedRow();
+        if (row < 0) return;
+        
+        int idOS = (int) tableModel.getValueAt(row, 0);
+        OrdemServico os = osService != null ? osService.listarTodasOS().stream()
+            .filter(o -> o.getId() == idOS).findFirst().orElse(null) : null;
+        
+        if (os == null) return;
+        
+        JTextArea txtDetalhes = new JTextArea(15, 50);
+        txtDetalhes.setEditable(false);
+        txtDetalhes.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        SimpleDateFormat sdfData = new SimpleDateFormat("dd/MM/yyyy");
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== DETALHES DA ORDEM DE SERVIÇO #").append(os.getId()).append(" ===\n\n");
+        sb.append("Cliente: ").append(tableModel.getValueAt(row, 1)).append("\n");
+        sb.append("Tipo: ").append(os.getTipoOs()).append("\n");
+        sb.append("Nível: ").append(os.getTipoNivel()).append("\n");
+        sb.append("Status: ").append(os.getStatus()).append("\n");
+        sb.append("Departamento Origem: ").append(os.getDepartamentoOrigem()).append("\n");
+        sb.append("Data Abertura: ").append(os.getDataAbertura() != null ? sdf.format(os.getDataAbertura()) : "---").append("\n");
+        sb.append("Data Fechamento: ").append(os.getDataFechamento() != null ? sdf.format(os.getDataFechamento()) : "---").append("\n");
+        sb.append("\n--- MOTIVO ---\n");
+        sb.append(os.getMotivo() != null ? os.getMotivo() : "---").append("\n");
+        
+        if (os.getDescricaoSolucao() != null && !os.getDescricaoSolucao().isEmpty()) {
+            sb.append("\n--- SOLUÇÃO ---\n");
+            sb.append(os.getDescricaoSolucao()).append("\n");
+        }
+        
+        if (os.getFalhaIdentificada() != null && !os.getFalhaIdentificada().isEmpty()) {
+            sb.append("\nFalha Identificada: ").append(os.getFalhaIdentificada()).append("\n");
+        }
+        
+        if (os.getValorTotal() > 0) {
+            sb.append("\nValor Total: R$ ").append(String.format("%.2f", os.getValorTotal())).append("\n");
+        }
+        
+        if (os.getEnderecoInstalacao() != null && !os.getEnderecoInstalacao().isEmpty()) {
+            sb.append("\nEndereço Instalação: ").append(os.getEnderecoInstalacao()).append("\n");
+        }
+        
+        // CORREÇÃO: Verificar se dataAgendamento é null antes de formatar
+        if (os.getDataAgendamento() != null) {
+            sb.append("Data Agendamento: ").append(sdfData.format(os.getDataAgendamento())).append("\n");
+        } else {
+            sb.append("Data Agendamento: ---\n");
+        }
+        
+        if (os.getObservacoes() != null && !os.getObservacoes().isEmpty()) {
+            sb.append("\nObservações: ").append(os.getObservacoes()).append("\n");
+        }
+        
+        txtDetalhes.setText(sb.toString());
+        
+        JOptionPane.showMessageDialog(this, new JScrollPane(txtDetalhes), 
+            "Detalhes da OS #" + idOS, JOptionPane.INFORMATION_MESSAGE);
+    }
+}
