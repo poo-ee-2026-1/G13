@@ -2,33 +2,25 @@
 
 ## Discentes: 
 
-```
----
 
 - Emiliano Rodrigues Feliciano
 - Gabriel Henrique Oliveira Silva 
 - Elberty Borges de Oliveira
 
----
-```
 
 ## Visão Geral
 
-```
----
+
 O VoltMonitor é um sistema java para monitoração em tempo real de tensão elétrica, com comunicação via WebSocket com placa ESP32 (Arduino) e sensor de tensão AC ZMPT101B. Inclui gestão de usuários, clientes, equipamentos, departamentos, atendimentos e geração automática de ordem de serviço para manutenção.
 
 Com a publicação da Resolução Normativa nº 482 de 2012 pela ANEEL, que permitiu aos consumidores instalarem pequenos sistemas e compensarem o excedente de energia na rede, observamos aumento significativo de estações fotovoltaicas de geração de energia elétrica. Normalmente o sistema é gerenciado diretamente pelo cliente (sem conhecimento técnico) ou por técnico especializado no local de instalação. Para que o sistema não seja sobrecarregado com tensão fora do padrão (muito diferente de 220V), é necessário que a tensão elétrica se mantenha dentro de limites pré-definidos. Neste projeto, gerenciaremos remotamente a tensão elétrica no sistema simulado de geração de energia elétrica por placa fotovoltaica.
 
 Com o objetivo de facilitar este monitoramento, será implementado software e hardware para medição de tensão elétrica de geração simulada e transmissão dos dados via wireless para central de processamento. Será considerada tensão elétrca dentro do padrão quando a mesma se manter entre 219V (mínimo) e 221V (máximo).
 
----
-```
 
 ## Requisitos
 
-```
----
+
 O servidor contará com as seguintes funcionalidades:
 
 a) Incluir e excluir cadastro de usuários (com nome, sobrenome, CPF, matrícula, função, login e senha pessoal que deverá ser digitada antes de entrar no sistema de monitoração. Usuários com a função de "Monitor" poderão visualizar somente as informações da tela principal de monitoração de clientes além de abrir e fechar Ordem de Serviço de 1º nível (reestabelecimento remoto). Usuários com a função de "Técnico" poderão somente visualizar as informações da tela principal de monitoração de clientes e abrir e fechar Ordem de Serviço de 2º nível (reestabelecimento presencial).
@@ -45,13 +37,9 @@ f) Relatórios de Usuários, Clientes, Equipamentos, Ordens de Serviço e Dispon
 
 g) Somente usuários com função de "Administrador" poderão incluir e excluir qualquer cadastro. Todos os outros usuários poderão apenas visualizar cadastros.
 
----
-```
 
 ## Operação
 
-```
----
 
 A tela principal do sistema de monitoração terá layout de grade com colunas "CLIENTE", "EQUIPAMENTO", "ESTADO DA REDE", "TENSÃO (V)", "MAIOR TENSÃO (V)", "MENOR TENSÃO (V)", "SITUAÇÃO DA REDE" e "DISPONIBILIDADE", além de atalhos para sair do sistema "ESC", atualizar dados de monitoração "F5", pausar dados monitoração "F8", ordens de serviço "F9" e data e hora local.
 
@@ -77,13 +65,10 @@ Na coluna "SITUAÇÃO DA REDE", deverá mostrar mensagem da situação da rede:
 	
 O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medida da tensão do cliente recebida pelo servidor apresentar "ESTADO DA REDE" igual a "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5000 milisegundos, ou valores da "SITUAÇÃO DA REDE" apresentar "MENOR TENSÃO (V)" ou "MAIOR TENSÃO (V)" mais que 3 mensagens de "ALERTA" ou "CRÍTICO". A Ordem de Serviço deve ser encaminhada para Suporte Técnico, usuário "Monitor" de 1º nível para reestabelecimento remoto. Caso não seja possível restabelecer serviço remotamente, deverá ser encaminhada para área de Suporte Técnico e tratada pelo usuário "Suporte" de 2º nível para reestabelecimento presencial. Deverá ser fechada com a descrição da solução e especificar se ponto de falha encontrada foi no cliente ou no serviço de monitoração.
 	
----
-```
 
 ## Arquitetura do Sistema
 
 ```
----
 
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                                    VISÃO GERAL                                      │
@@ -202,13 +187,12 @@ O sistema também deverá abrir Ordem de Serviço (OS) automaticamente caso medi
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
----
 ```
 
 ## Estrutura do Projeto
 
 ```
----
+
 VOLTMONITOR/
 │
 ├── pom.xml                                   # Dependências Maven (Jackson)
@@ -304,12 +288,12 @@ VOLTMONITOR/
 │
 └── README.md                                  # Documentação do projeto
 
----
 ```
 
 ## Diagrama de Classes
 
 ```
+
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                              SISTEMA VOLTMONITOR                                            │
 │                                              Diagrama de Classes (UML)                                      │
@@ -660,28 +644,24 @@ VOLTMONITOR/
 │ - verDetalhesProduto()                    │       │ + criarPainelContasPagar()              │
 └───────────────────────────────────────────┘       │ + criarPainelContasReceber()            │
                                                     └─────────────────────────────────────────┘
----
+
 ```
+
 ### Legenda de Relacionamentos
 
-```
----
-|---------|-------------|
-| Símbolo | Significado |
-|---------|-------------|
-| `─────►`  | Associação / Dependência |
-| `▷─────` | Herança / Implementação de interface |
-| `◆─────` | Composição (parte-todo forte) |
-| `◇─────` | Agregação (parte-todo fraca) |
-| `1` / `*` | Multiplicidade (um / muitos) |
 
----
-```
+| Símbolo      | Significado                               |
+|--------------|-------------------------------------------|
+| ─────►       | Associação / Dependência                  |
+| ▷─────       | Herança / Implementação de interface      |
+| ◆─────       | Composição (parte-todo forte)             |
+| ◇─────       | Agregação (parte-todo fraca)              |
+| 1 / *        | Multiplicidade (um / muitos)              |
+
 
 ### Observações
 
-```
-´´´´
+
 1. *MonitoramentoService.DadosMonitoramento** é uma classe interna (inner class) que encapsula os dados de monitoramento de cada cliente em tempo real.
 
 2. **OrdemServicoService** implementa a interface `OrdemServicoCallback` para receber callbacks do `MonitoramentoService` quando uma OS precisa ser aberta automaticamente.
@@ -694,15 +674,13 @@ VOLTMONITOR/
 
 6. **ValidadorDocumento** é uma classe utilitária estática para validação e formatação de CPF e CNPJ.
 
----
-```
 
 ## Principais Fluxos
 
 ### Fluxo de Dados Principal
 
 ```
----
+
 ┌──────────┐    HTTP POST     ┌─────────────────┐    receberMedicao()    ┌─────────────────────┐
 │   ESP32  │  ──────────────► │  HttpApiServer  │  ────────────────────► │ MonitoramentoService│
 │  (Sensor)│   /api/voltage   │  (porta 8081)   │                        │                     │
@@ -711,18 +689,17 @@ VOLTMONITOR/
                                     ┌────────────────────────────────────────────────┼────────────────────────────────────────────────┐
                                     │                                                │                                                │
                                     ▼                                                ▼                                                ▼
-                          ┌─────────────────┐                              ┌─────────────────┐                              ┌───────────────────┐
-                          │  WebSocketServer│                              │ MedicaoTensaoDAO│                              │OrdemServicoService│
-                          │   (porta 8080)  │                              │  (salvar JSON)  │                              │ (callback OS)     │
-                          └─────────────────┘                              └─────────────────┘                              └───────────────────┘
+                           ┌─────────────────┐                              ┌─────────────────┐                              ┌───────────────────┐
+                           │  WebSocketServer│                              │ MedicaoTensaoDAO│                              │ OrdemServicoService│
+                           │   (porta 8080)  │                              │  (salvar JSON)  │                              │   (callback OS)    │
+                           └─────────────────┘                              └─────────────────┘                              └───────────────────┘
 
----
 ```
 
 ### Fluxo e Monitoramento
 
 ```
----
+
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │                              Processo de Monitoramento Contínuo                             │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -750,13 +727,12 @@ Modo	   Atualização Tela   	Abertura OS Automática	Abertura OS Manual
 PAUSADO	  ❌ Não	            ❌ Não	                ✅ Sim
 ATIVO	  ✅ Sim (1s)	        ✅ Sim	                ✅ Sim
 
----
+
 ```
 
 ### Fluxo de Login e Navegação
 
 ```
----
 ┌─────────────────┐
 │   TelaLogin     │
 │  login/senha    │
@@ -785,13 +761,11 @@ ATIVO	  ✅ Sim (1s)	        ✅ Sim	                ✅ Sim
          ├──► TelaFinanceiro (transações, contas a pagar/receber)
          └──► TelaRelatorios (múltiplas abas de relatórios)
 
----
 ```
 
 ## Estrutura de Arquivos Json
 
 ```
----
 
 Todos os dados são persistidos no diretório `data/` na raiz do projeto:
 
@@ -835,13 +809,11 @@ Todos os dados são persistidos no diretório `data/` na raiz do projeto:
   }
 ]
 
----
 ```
 
 ## Módulos
 
 ```
----
 
 Módulo de Monitoramento
     Recebimento de medições via HTTP (ESP32)
@@ -893,7 +865,6 @@ Módulo de Relatórios
     Listas (usuários, clientes, equipamentos, departamentos, funções)
     Exportação para CSV
 
----
 ```
 
 ## Funcionalidades
@@ -901,7 +872,6 @@ Módulo de Relatórios
 ### Controle de Acesso
 
 ```
----
 
 |-----------------|------------------------------------------------------------|
 | Função          | Permissões                                                 |
@@ -911,13 +881,11 @@ Módulo de Relatórios
 | Técnico         | Visualização da tela de monitoração e suporte de 2º nível  |
 |-----------------|------------------------------------------------------------|
 
----
 ```
 
 ### Tela Principal de Monitoração
 
 ```
----
 
 **Grade em tempo real com as seguintes colunas:**
 |-------------------|--------------------------------------------------|
@@ -939,19 +907,17 @@ Módulo de Relatórios
 - `F8`  → Pausar / Retomar monitoração
 - `F9`  → OS / Ordens de Serviço
 
----
 ```
 
 ### Lógica de Estados
 
 ```
----
 
 **Estados da Rede:**
 
-- `● ATIVO` (verde) — ESP32 enviando dados + tensão > 0V
-- `⛔ INATIVO` (vermelho claro) — tensão = 0V
-- `⛔ SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2500 milisegundos
+- `ATIVO` (verde) — ESP32 enviando dados + tensão > 0V
+- `INATIVO` (vermelho claro) — tensão = 0V
+- `SEM COMUNICAÇÃO` (vermelho escuro) — sem dados por > 2500 milisegundos
 
 **Situação da Rede:** (baseada na tensão nominal do equipamento):
 
@@ -959,48 +925,28 @@ Módulo de Relatórios
 - `⚠ ALERTA` — tensão entre ±2V e ±3V da nominal
 - `✖ CRÍTICO` — tensão além de ±4V nominal (+ alerta sonoro)
 
----
 ```
 
 ### Ordem de Serviço Automática
 
-```
----
 
 OS é aberta automaticamente pelo departamento de Monitoração para reestabalecimento remoto. Caso não seja possível, deverá ser encaminhada para departamento de Suporte Técnico. Dados de monitoração deve apresentar pelo menos 1 dos 2 casos abaixo:
 
 - Estado da Rede = "INATIVO" ou "SEM COMUNICAÇÃO" por mais de 5000 milisegundos
 - Mais de 3 ocorrências de "ALERTA" ou "CRÍTICO"
 
----
-```
 
 ## Banco de Dados Persistente
 
-```
----
 
 O sistema NÃO utiliza banco de dados relacional (MySQL/PostgreSQL). Em vez disso, utiliza armazenamento em arquivos JSON através da classe DatabaseConnection, que gerencia:
     Leitura/escrita de listas de objetos via Jackson (JSON)
     Geração automática de IDs sequenciais
     Criação automática do diretório data/ e arquivos vazios na primeira execução
 
-Vantagens da abordagem:
-    ✅ Leve, sem necessidade de instalar SGBD
-    ✅ Portável (copia o diretório data/ para outro computador)
-    ✅ Fácil debugging (arquivos legíveis por humanos)
-
-Limitações:
-    ❌ Sem concorrência avançada (escrita simultânea)
-    ❌ Sem índices otimizados para grandes volumes (funciona bem para até milhares de registros)
-
----
-```
 
 ## Pré-requisitos
 
-```
----
 
 - **Java** (JDK)
 - **Maven**
@@ -1010,13 +956,10 @@ Limitações:
 - **Roteador** A930H
 - Computador - **Servidor Local**
 
----
-```
 
 ## Credenciais Padrão
 
 ```
----
 
 |----------|--------------|
 | Campo    | Valor        |
@@ -1026,13 +969,10 @@ Limitações:
 | Função   | Administrador|
 |----------|--------------|
 
----
 ```
 
 ### Validações
 
-```
----
 
 - **CPF**: algoritmo oficial com dígitos verificadores
 - **CNPJ**: algoritmo oficial com dígitos verificadores
@@ -1040,15 +980,12 @@ Limitações:
 - **Telefone**: DDD com exatamente 2 dígitos numéricos, número com exatamente 9 dígitos
 - **Tensão nominal**: entre 1V e 380V
 
----
-```
 
 ## Configuração do ESP32
 
 ### Alimentação do ESP32 via USB
 
 ```
----
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Alimentação USB (5V)                         │
@@ -1073,13 +1010,11 @@ Limitações:
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
----
 ```
 
 ### Hardware
 
 ```
----
 
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                          ESP32 - Módulo ZMPT101B                                    │
@@ -1106,13 +1041,11 @@ Limitações:
                                             │   110V ou 220V  │
                                             │     (~50-60Hz)  │
                                             └─────────────────┘
----
 ```
 
 ### Segurança contra Acidentes
 
 ```
----
 
 ╔═══════════════════════════════════════════════════════════════════════════════════╗
 ║                              ⚠️  ATENÇÃO - SEGURANÇA  ⚠️                         ║
@@ -1134,25 +1067,19 @@ Limitações:
 ║                                                                                   ║
 ╚═══════════════════════════════════════════════════════════════════════════════════╝
 
----
 ```
 
 ### Bibliotecas Arduíno Necessárias
 
-```
----
 
 - `Arduino IDE` (Gerenciador de Bibliotecas):
 - `ArduinoWebsockets`
 - `ArduinoJson`
 
----
-```
 
 ### Configuração de Rede
 
 ```
----
 
 const char* ssid = "POO-G13";
 const char* password = "12345678";
@@ -1171,13 +1098,11 @@ const int serverPort = 8080;                // Porta do WebSocketServer/HttpApiS
 #define FREQUENCY 60.0
 float sensitivity = 500.0;  // Ajustar na calibração
 
----
 ```
 
 ### Protocolo de Comunicação
 
 ```
----
 
 O ESP32 envia JSON via WebSocket a cada 500ms:
 ```json
@@ -1186,13 +1111,11 @@ O ESP32 envia JSON via WebSocket a cada 500ms:
 O servidor identifica o cliente pelo campo `"ip"`, que deve coincidir
 com o **IP Local** cadastrado no registro do cliente.
 
----
 ```
 
 ### Verificação de Conexão
 
 ```
----
 
 - Testar se o servidor está respondendo
 curl http://192.168.43.200:8080/api/health
@@ -1202,13 +1125,11 @@ curl -X POST http://192.168.43.200:8080/api/voltage \
   -H "Content-Type: application/json" \
   -d '{"voltage": 220.5}'
 
----
 ```
 
 ### LEDs Indicadores no ESP32
 
 ```
----
 
 Comportamento	                        Significado
 Pisca 3x ao ligar	                    Inicialização
@@ -1216,13 +1137,11 @@ Pisca 5x rápido	                        WiFi conectado com sucesso
 LED acende brevemente a cada POST	    Transmissão de dados ativa
 Pisca lento (1s ligado/1s desligado)	WiFi desconectado
 
----
 ```
 
 ## Dependências Mavem
 
 ```
----
 
 |----------------------|---------|------------------------------|
 | Biblioteca           | Versão  | Uso                          |
@@ -1237,13 +1156,11 @@ Pisca lento (1s ligado/1s desligado)	WiFi desconectado
 | jdk-26_windows       | x64_bin | Data                         |
 |----------------------|---------|------------------------------|
 
----
 ```
 
 ## Segurança
 
 ```
----
 
 Aspecto                                            	   Implementação
 Autenticação	                                       Login/senha armazenados em usuarios.json (senha em texto plano - melhorar)
@@ -1252,23 +1169,21 @@ Nível de OS	Usuário 1º Nível vê apenas OS de 1º Nível  3º Nível vê tod
 Validação de CPF/CNPJ	                               Validação de dígitos verificadores em ValidadorDocumento.java
 Unicidade                                              Documento+Endereço único para clientes; login/CPF/matrícula único para usuários
 
----
 ```
 
 ## Cronograma
 
 ```
----
 
 📅 Semana 1: 16/03
 Infraestrutura e Camada de Persistência
-Atividade                            Descrição                                                                           
-Configuração do ambiente             Instalação do JDK 11+, Maven, IDE (IntelliJ/Eclipse) e Git                          
-Criação da estrutura de diretórios   Pacotes: model, dao, ui, service, util                                              
-Configuração do pom.xml              Adicionar dependências: Jackson Databind e Jackson JSR310                           
-Implementação da DatabaseConnection  Métodos: carregarLista(), salvarLista(), gerarNovoId(), inicializarArquivos()       
-Criação das entidades base           Cliente.java, Equipamento.java, Usuario.java                                        
-Implementação dos DAOs iniciais      ClienteDAO.java, EquipamentoDAO.java, UsuarioDAO.java                               
+Atividade                            Descrição                                                                      
+Configuração do ambiente             Instalação do JDK 11+, Maven, IDE (IntelliJ/Eclipse) e Git
+Criação da estrutura de diretórios   Pacotes: model, dao, ui, service, util 
+Configuração do pom.xml              Adicionar dependências: Jackson Databind e Jackson JSR310
+Implementação da DatabaseConnection  Métodos: carregarLista(), salvarLista(), gerarNovoId(), inicializarArquivos()
+Criação das entidades base           Cliente.java, Equipamento.java, Usuario.java
+Implementação dos DAOs iniciais      ClienteDAO.java, EquipamentoDAO.java, UsuarioDAO.java 
 Teste de persistência                Verificar criação do diretório data/ e arquivos JSON                               
 
 📅 Semana 2: 23/03
@@ -1284,6 +1199,7 @@ Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções
 Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
 Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
+
 📅 Semana 3: 30/03
 Módulo de Clientes e Equipamentos
 Atividade                                            Descrição                                               
@@ -1296,6 +1212,7 @@ Desenvolvimento da TelaDepartamentos.java            CRUD completo de departamen
 Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções                                
 Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
 Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
+
 
 📅 Semana 4: 06/04
 Módulo de Monitoramento e Comunicação ESP32
@@ -1310,6 +1227,7 @@ Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções
 Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
 Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
+
 📅 Semana 5: 13/04
 Módulo de Atendimento e Ordens de Serviço
 aAtividade                                            Descrição                                               
@@ -1323,13 +1241,14 @@ Desenvolvimento da TelaFuncoes.java                  CRUD completo de funções
 Inicialização de dados padrão                        Departamento e Funções padrão no Main.java              
 Criação do usuário admin padrão                      Login: admin / Senha: admin123                         
 
+
 📅 Semana 6: 20/04
 Módulo de Estoque
-Atividade                                                                Descrição                                                                                      
+Atividade                                                                Descrição
 Implementação do ProdutoEstoque.java e ProdutoEstoqueDAO.java            CRUD de produtos, campos: código, nome, categoria, quantidade, quantidade mínima, preços       
 Implementação do MovimentacaoEstoque.java e MovimentacaoEstoqueDAO.java  Histórico de movimentações (entrada/saída/reserva)                                             
-Desenvolvimento da TelaEstoque.java                                      CRUD completo de produtos                                                                      
-Destaque visual para estoque baixo                                       Coluna quantidade com ícone ⚠️                                                                 
+Desenvolvimento da TelaEstoque.java                                      CRUD completo de produtos 
+Destaque visual para estoque baixo                                       Coluna quantidade com ícone 
 Desenvolvimento da TelaEstoqueBaixo.java                                 Filtro automático de produtos com quantidade ≤ mínima                                          
 Implementação do listener estático                                       addEstoqueBaixoListener(), notificarListenersEstoqueBaixo()                                    
 Atualização automática                                                   Quando TelaEstoque altera produtos, TelaEstoqueBaixo atualiza                                  
@@ -1337,64 +1256,64 @@ Botão "Solicitar Compra"                                                 Geraç
 Desenvolvimento da TelaMovimentacoesEstoque.java                         Histórico com filtros (tipo, motivo, período)                                                  
 Resumo financeiro                                                        Total entradas, total saídas, saldo do período
 
+
 📅 Semana 7: 27/04
 Módulo de Orçamentos e Instalações
-Atividade                                                            Descrição                                                   
+Atividade                                                            Descrição
 Desenvolvimento da TelaOrcamento.java                                Criação de orçamentos, seleção de produtos do estoque       
-Persistência de orçamentos                                           Arquivo orcamentos.json                                     
-Aprovação de orçamento                                               Reserva de produtos no estoque                              
-Implementação do ReservaProduto.java e ReservaProdutoDAO.java        Gerenciamento de reservas                                   
-Rejeição de orçamento                                                Cancelamento de reserva                                     
-Desenvolvimento da TelaOrdemInstalacao.java                          Listagem de OS de instalação                                
-Conversão de orçamento aprovado em OS de instalação                  Baixa no estoque (consumo da reserva)                       
-Implementação do InstalacaoProduto.java e InstalacaoProdutoDAO.java  Produtos vinculados à OS de instalação                      
-Conclusão de instalação                                              Baixa final no estoque                                      
-Geração de mensalidades de monitoramento                             Ao concluir instalação, gerar parcelas                      
+Persistência de orçamentos                                           Arquivo orcamentos.json
+Aprovação de orçamento                                               Reserva de produtos no estoque
+Implementação do ReservaProduto.java e ReservaProdutoDAO.java        Gerenciamento de reservas
+Rejeição de orçamento                                                Cancelamento de reserva
+Desenvolvimento da TelaOrdemInstalacao.java                          Listagem de OS de instalação
+Conversão de orçamento aprovado em OS de instalação                  Baixa no estoque (consumo da reserva)
+Implementação do InstalacaoProduto.java e InstalacaoProdutoDAO.java  Produtos vinculados à OS de instalação
+Conclusão de instalação                                              Baixa final no estoque
+Geração de mensalidades de monitoramento                             Ao concluir instalação, gerar parcelas
 Geração de conta a receber da instalação                             Valor total no financeiro                                 
 
 📅 Semana 8: 04/05
 Módulo Financeiro e RH
-Atividade                                                                  Descrição                                                                                   
-Implementação do TransacaoFinanceira.java e TransacaoFinanceiraDAO.java    CRUD de transações, cálculo de saldo                                                        
-Implementação do ParcelaMonitoramento.java e ParcelaMonitoramentoDAO.java  Parcelas de mensalidades                                                                    
+Atividade                                                                  Descrição
+Implementação do TransacaoFinanceira.java e TransacaoFinanceiraDAO.java    CRUD de transações, cálculo de saldo
+Implementação do ParcelaMonitoramento.java e ParcelaMonitoramentoDAO.java  Parcelas de mensalidades 
 Desenvolvimento da TelaFinanceiro.java                                     Abas: Transações, Contas à Pagar, Contas à Receber, Resumo Financeiro, Nova Transação       
-Filtros por tipo, status, período                                          Listagem dinâmica                                                                           
-Geração de parcelas                                                        Integração com conclusão de instalação                                                      
+Filtros por tipo, status, período                                          Listagem dinâmica 
+Geração de parcelas                                                        Integração com conclusão de instalação 
 Desenvolvimento da TelaRH.java                                             CRUD de funcionários (campos: nome, CPF, matrícula, função, departamento)                   
 Campo nível de atendimento                                                 1º Nível, 2º Nível, 3º Nível (controle de visibilidade de OS)                               
-Método podeVisualizarNivel()                                               Implementado em Usuario.java                                                                
+Método podeVisualizarNivel()                                               Implementado em Usuario.java
 Integração com TelaOrdensServico e TelaTI                                  Filtro de OS por nível do usuário                                                           
                                                                                                                                                  
 📅 Semana 9: 11/05
 Módulo de Relatórios e Finalização do TI
-Atividade                                 Descrição                                                                                                 
+Atividade                                 Descrição  
 Desenvolvimento da TelaRelatorios.java    Múltiplas abas: Ordens de Serviço, Medição de Tensão, Disponibilidade, Estatísticas Gerais, Listas        
-Aba Ordens de Serviço                     Listagem com filtros (status, nível, tipo, cliente)                                                       
+Aba Ordens de Serviço                     Listagem com filtros (status, nível, tipo, cliente)
 Aba Medição de Tensão                     Seleção de cliente, período, gráfico (se implementado), resumo (média, min, max, alertas, críticos)       
-Aba Disponibilidade                       Tabela com disponibilidade por cliente, média geral                                                       
+Aba Disponibilidade                       Tabela com disponibilidade por cliente, média geral
 Aba Estatísticas Gerais                   Métricas: total OS, abertas/fechadas, tempo médio resolução, falhas por categoria                         
-Aba Listas                                Tabelas: Usuários, Clientes, Equipamentos, Departamentos, Funções                                         
-Botão Exportar CSV                        Exportar dados da aba atual                                                                               
-Desenvolvimento da TelaTI.java            Gestão de OS para TI (REPARO)                                                                             
-Filtros por status, nível, tipo, cliente  Similar à TelaOrdensServico                                                                               
-Escalonamento (1º → 2º → 3º Nível)        Baseado no nível do usuário                                                                               
+Aba Listas                                Tabelas: Usuários, Clientes, Equipamentos, Departamentos, Funções
+Botão Exportar CSV                        Exportar dados da aba atual 
+Desenvolvimento da TelaTI.java            Gestão de OS para TI (REPARO) 
+Filtros por status, nível, tipo, cliente  Similar à TelaOrdensServico
+Escalonamento (1º → 2º → 3º Nível)        Baseado no nível do usuário
 Finalização da TelaVisualizarOS.java      Detalhamento de OS individual                                                                            
 
 📅 Semana 10: 18/05
 Integração e Testes do ESP32
-Atividade                             Descrição                                                                           
-Código Arduino para ESP32             Leitura do sensor ZMPT101B, calibração de sensibilidade                             
-Configuração WiFi                     IP estático, conexão à rede                                                         
-Envio de medições                     POST para http://servidor:8080/api/voltage a cada 500ms                             
-Formato JSON                          \{"voltage": 220.50, "timestamp": xxx, "deviceId": "ESP32\_01"\}                    
-Teste de integração ESP32 ↔ Servidor  Verificar recebimento e processamento                                               
-Mapeamento IP → Cliente               Configurar IP do ESP32 no cadastro do cliente                                       
-Teste de abertura automática de OS    Simular tensão zero, alertas, críticos                                              
-Teste de timeout                      Desconectar ESP32 e verificar OS após 10s                                           
-Teste de disponibilidade              Verificar cálculo correto                                                           
+Atividade                             Descrição
+Código Arduino para ESP32             Leitura do sensor ZMPT101B, calibração de sensibilidade 
+Configuração WiFi                     IP estático, conexão à rede
+Envio de medições                     POST para http://servidor:8080/api/voltage a cada 500ms
+Formato JSON                          \{"voltage": 220.50, "timestamp": xxx, "deviceId": "ESP32\_01"\} 
+Teste de integração ESP32 ↔ Servidor  Verificar recebimento e processamento
+Mapeamento IP → Cliente               Configurar IP do ESP32 no cadastro do cliente
+Teste de abertura automática de OS    Simular tensão zero, alertas, críticos
+Teste de timeout                      Desconectar ESP32 e verificar OS após 10s
+Teste de disponibilidade              Verificar cálculo correto 
 Modo de simulação do servidor         Comandos via console (simular, listar, sair)   
                                                                                                                           
-
 📅 Semana 11: 25/05
 Testes Integrados e Correções
 Atividade                                  Descrição                                                     
@@ -1410,6 +1329,7 @@ Teste de permissões                        Usuários 1º/2º/3º Nível visuali
 Correção de bugs                           Identificados durante os testes                               
 Otimização de performance                  Queries de JSON, atualizações de tela                        
 
+
 📅 Semana 12: 01/06
 Documentação e Entrega Final
 Atividade                         Descrição                                                         
@@ -1424,13 +1344,11 @@ Preparação dos arquivos de dados  Incluir dados de exemplo no diretório data/
 Revisão final                     Verificar checklist de requisitos                                 
 Entrega do projeto                Código-fonte, documentação, JAR, e dados de exemplo               
 
----
 ````
 
 ## Resumo do Cronograma
 
 ```
----
 
 Data   Marco                     Principais Entregáveis                                      
 16/03  Infraestrutura            DatabaseConnection, Entidades Base, DAOs iniciais           
@@ -1446,15 +1364,13 @@ Data   Marco                     Principais Entregáveis
 25/05  Testes Integrados         Validação de todos os fluxos, correções                     
 01/06  Entrega Final             Documentação, JAR, manual, vídeo                           
 
----
 ```
 
 ## Finalidade
 
 ```
----
 
-Projeto desenvolvido para fins educacionais na disciplina de POO - Programação Orientada a Objetos - 2026-1.
+Projeto desenvolvido para fins educacionais na disciplina de POO - Programação Orientada a Objetos - 2026-1 do curso de Engenharia Elétrica da Univerdade Federal de Goiás - UFG.
 
----
+
 ```
